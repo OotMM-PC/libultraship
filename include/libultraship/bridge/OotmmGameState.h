@@ -5,12 +5,24 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 namespace Ship {
 
 enum class OotmmGame {
     Oot,
     Mm,
+};
+
+struct OotmmEntranceMapping {
+    OotmmGame FromGame = OotmmGame::Oot;
+    std::string From;
+    std::optional<uint32_t> FromNativeId;
+    OotmmGame ToGame = OotmmGame::Oot;
+    std::string To;
+    std::optional<uint32_t> ToNativeId;
+
+    bool IsCrossGame() const;
 };
 
 struct OotmmBootConfig {
@@ -50,6 +62,8 @@ class OotmmGameState {
     bool HasWorldFlag(const std::string& name) const;
     bool WorldFlagContains(const std::string& name, const std::string& member) const;
     bool IsDungeonPreCompleted(const std::string& dungeon) const;
+    const std::vector<OotmmEntranceMapping>& GetEntrances() const;
+    const OotmmEntranceMapping* FindEntrance(OotmmGame game, uint32_t nativeId) const;
     const std::string& GetLastError() const;
 
   private:
@@ -65,6 +79,7 @@ class OotmmGameState {
     std::unordered_map<std::string, std::unordered_set<std::string>> mWorldFlags;
     std::unordered_set<std::string> mAllWorldFlags;
     std::unordered_set<std::string> mPreCompletedDungeons;
+    std::vector<OotmmEntranceMapping> mEntrances;
     std::string mLastError;
     bool mActive = false;
     bool mHasSeed = false;

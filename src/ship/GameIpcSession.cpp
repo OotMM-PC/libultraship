@@ -51,6 +51,7 @@ void GameIpcSession::Stop() {
     mUnhandled.clear();
     mWasConnected = false;
     mWelcomed = false;
+    mTransitionAccepted = false;
 }
 
 bool GameIpcSession::Pump(GameIpcSettings& settings) {
@@ -77,6 +78,31 @@ bool GameIpcSession::AcknowledgeSettings(uint64_t revision) {
         { "revision", revision },
     };
     return Send(applied.dump());
+}
+
+bool GameIpcSession::RequestCrossGameTransition(std::string fromGame, std::string toGame,
+                                                std::string toEntrance, std::optional<uint32_t> toNativeId,
+                                                std::optional<uint32_t> ootAge) {
+    nlohmann::json transition{
+        { "type", GameIpcMessageType::CrossGameTransition },
+        { "fromGame", std::move(fromGame) },
+        { "toGame", std::move(toGame) },
+        { "toEntrance", std::move(toEntrance) },
+    };
+    if (toNativeId.has_value()) {
+        transition["toNativeId"] = *toNativeId;
+    }
+    if (ootAge.has_value()) {
+        transition["ootAge"] = *ootAge;
+    }
+    mTransitionAccepted = false;
+    return Send(transition.dump());
+}
+
+bool GameIpcSession::ConsumeTransitionAccepted() {
+    const bool accepted = mTransitionAccepted;
+    mTransitionAccepted = false;
+    return accepted;
 }
 
 bool GameIpcSession::Send(std::string message) {
@@ -141,6 +167,11 @@ void GameIpcSession::HandleMessage(const std::string& message, GameIpcSettings& 
         if (mWelcomed) {
             mClient.Send(message);
         }
+        return;
+    }
+
+    if (type == GameIpcMessageType::TransitionAccepted) {
+        mTransitionAccepted = mWelcomed;
         return;
     }
 

@@ -71,6 +71,10 @@ std::string SanitizePathComponent(const std::string& source, size_t limit) {
 
 } // namespace
 
+bool OotmmEntranceMapping::IsCrossGame() const {
+    return FromGame != ToGame;
+}
+
 bool OotmmGameState::LoadFromEnvironment() {
     const char* path = std::getenv("OOTMM_BOOT_CONFIG");
     if (path == nullptr || path[0] == '\0') {
@@ -156,6 +160,7 @@ void OotmmGameState::Reset() {
     mWorldFlags.clear();
     mAllWorldFlags.clear();
     mPreCompletedDungeons.clear();
+    mEntrances.clear();
     mLastError.clear();
     mActive = false;
     mHasSeed = false;
@@ -214,6 +219,17 @@ bool OotmmGameState::WorldFlagContains(const std::string& name, const std::strin
 
 bool OotmmGameState::IsDungeonPreCompleted(const std::string& dungeon) const {
     return mPreCompletedDungeons.contains(dungeon);
+}
+
+const std::vector<OotmmEntranceMapping>& OotmmGameState::GetEntrances() const {
+    return mEntrances;
+}
+
+const OotmmEntranceMapping* OotmmGameState::FindEntrance(OotmmGame game, uint32_t nativeId) const {
+    const auto mapping = std::find_if(mEntrances.begin(), mEntrances.end(), [game, nativeId](const auto& entrance) {
+        return entrance.FromGame == game && entrance.FromNativeId == nativeId;
+    });
+    return mapping == mEntrances.end() ? nullptr : &*mapping;
 }
 
 const std::string& OotmmGameState::GetLastError() const {
@@ -306,6 +322,34 @@ bool OotmmGameState::LoadSeed() {
             if (dungeon.is_string()) {
                 mPreCompletedDungeons.emplace(dungeon.get<std::string>());
             }
+        }
+    }
+
+    const auto entrances = root.find("entrances");
+    if (entrances != root.end() && entrances->is_array()) {
+        for (const auto& value : *entrances) {
+            if (!value.is_object()) {
+                continue;
+            }
+            const auto fromGame = value.find("fromGame");
+            const auto toGame = value.find("toGame");
+            if (fromGame == value.end() || toGame == value.end()) {
+                continue;
+            }
+            const auto parsedFromGame = ParseGame(*fromGame);
+            const auto parsedToGame = ParseGame(*toGame);
+            if (!parsedFromGame.has_value() || !parsedToGame.has_value()) {
+                continue;
+            }
+
+            OotmmEntranceMapping mapping;
+            mapping.FromGame = *parsedFromGame;
+            mapping.From = ReadString(value, "from");
+            mapping.FromNativeId = ReadU32(value, "fromNativeId");
+            mapping.ToGame = *parsedToGame;
+            mapping.To = ReadString(value, "to");
+            mapping.ToNativeId = ReadU32(value, "toNativeId");
+            mEntrances.emplace_back(std::move(mapping));
         }
     }
 

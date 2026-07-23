@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <deque>
+#include <optional>
 #include <string>
 
 namespace Ship {
@@ -45,6 +46,9 @@ class GameIpcSession {
     void Stop();
     bool Pump(GameIpcSettings& settings);
     bool AcknowledgeSettings(uint64_t revision);
+    bool RequestCrossGameTransition(std::string fromGame, std::string toGame, std::string toEntrance,
+                                    std::optional<uint32_t> toNativeId, std::optional<uint32_t> ootAge);
+    bool ConsumeTransitionAccepted();
     bool Send(std::string message);
     bool TryReceive(std::string& message);
     bool IsConnected() const;
@@ -62,6 +66,7 @@ class GameIpcSession {
     std::deque<std::string> mUnhandled;
     bool mWasConnected = false;
     bool mWelcomed = false;
+    bool mTransitionAccepted = false;
 };
 
 } // namespace Ship
