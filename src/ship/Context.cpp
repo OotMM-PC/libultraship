@@ -9,6 +9,7 @@
 #include "ship/controller/controldeck/ControlDeck.h"
 #include "ship/debug/CrashHandler.h"
 #include "ship/window/FileDropMgr.h"
+#include "ship/window/WindowEmbedding.h"
 
 #ifdef _WIN32
 #include <libloaderapi.h>
@@ -106,40 +107,47 @@ bool Context::InitLogging(spdlog::level::level_enum debugBuildLogLevel,
         std::vector<spdlog::sink_ptr> sinks;
 
 #if (!defined(_WIN32)) || defined(_DEBUG)
+        const bool isEmbedded = IsWindowEmbedded();
 #if defined(_DEBUG) && defined(_WIN32)
-        // LLVM on Windows allocs a hidden console in its entrypoint function.
-        // We free that console here to create our own.
-        FreeConsole();
-        if (AllocConsole() == 0) {
-            throw std::system_error(GetLastError(), std::generic_category(), "Failed to create debug console");
+        if (!isEmbedded) {
+            // LLVM on Windows allocs a hidden console in its entrypoint function.
+            // We free that console here to create our own.
+            FreeConsole();
+            if (AllocConsole() == 0) {
+                throw std::system_error(GetLastError(), std::generic_category(), "Failed to create debug console");
+            }
+
+            SetConsoleOutputCP(CP_UTF8);
+
+            FILE* fDummy;
+            freopen_s(&fDummy, "CONOUT$", "w", stdout);
+            freopen_s(&fDummy, "CONOUT$", "w", stderr);
+            freopen_s(&fDummy, "CONIN$", "r", stdin);
+            std::cout.clear();
+            std::clog.clear();
+            std::cerr.clear();
+            std::cin.clear();
+
+            HANDLE hConOut = CreateFile(_T("CONOUT$"), GENERIC_READ | GENERIC_WRITE,
+                                        FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL,
+                                        NULL);
+            HANDLE hConIn = CreateFile(_T("CONIN$"), GENERIC_READ | GENERIC_WRITE,
+                                       FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL,
+                                       NULL);
+            SetStdHandle(STD_OUTPUT_HANDLE, hConOut);
+            SetStdHandle(STD_ERROR_HANDLE, hConOut);
+            SetStdHandle(STD_INPUT_HANDLE, hConIn);
+            std::wcout.clear();
+            std::wclog.clear();
+            std::wcerr.clear();
+            std::wcin.clear();
         }
-
-        SetConsoleOutputCP(CP_UTF8);
-
-        FILE* fDummy;
-        freopen_s(&fDummy, "CONOUT$", "w", stdout);
-        freopen_s(&fDummy, "CONOUT$", "w", stderr);
-        freopen_s(&fDummy, "CONIN$", "r", stdin);
-        std::cout.clear();
-        std::clog.clear();
-        std::cerr.clear();
-        std::cin.clear();
-
-        HANDLE hConOut = CreateFile(_T("CONOUT$"), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                    NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-        HANDLE hConIn = CreateFile(_T("CONIN$"), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                   OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-        SetStdHandle(STD_OUTPUT_HANDLE, hConOut);
-        SetStdHandle(STD_ERROR_HANDLE, hConOut);
-        SetStdHandle(STD_INPUT_HANDLE, hConIn);
-        std::wcout.clear();
-        std::wclog.clear();
-        std::wcerr.clear();
-        std::wcin.clear();
 #endif
-        auto systemConsoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-        // systemConsoleSink->set_level(spdlog::level::trace);
-        sinks.push_back(systemConsoleSink);
+        if (!isEmbedded) {
+            auto systemConsoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+            // systemConsoleSink->set_level(spdlog::level::trace);
+            sinks.push_back(systemConsoleSink);
+        }
 #endif
 
         auto logPath = GetPathRelativeToAppDirectory(("logs/" + GetName() + ".log"));

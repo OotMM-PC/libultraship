@@ -25,6 +25,7 @@
 #include "ship/config/Config.h"
 #include "ship/Context.h"
 #include "ship/window/FileDropMgr.h"
+#include "ship/window/WindowEmbedding.h"
 
 #include "libultraship/bridge/controllerbridge.h"
 
@@ -145,6 +146,10 @@ static bool GetMonitorAtCoords(std::vector<std::tuple<HMONITOR, RECT, BOOL>> Mon
 }
 
 void GfxWindowBackendDXGI::ToggleBorderlessWindowFullScreen(bool enable, bool call_callback) {
+    if (Ship::IsWindowEmbedded()) {
+        return;
+    }
+
     // Windows 7 + flip mode + waitable object can't go to exclusive fullscreen,
     // so do borderless instead. If DWM is enabled, this means we get one monitor
     // sync interval of latency extra. On Win 10 however (maybe Win 8 too), due to
@@ -585,8 +590,13 @@ void GfxWindowBackendDXGI::Init(const char* game_name, const char* gfx_api_name,
         posY = 100;
     }
 
-    h_wnd = CreateWindowW(WINCLASS_NAME, w_title, WS_OVERLAPPEDWINDOW, posX + wr.left, posY + wr.top, current_width,
-                          current_height, nullptr, nullptr, nullptr, this);
+    if (const auto parent = reinterpret_cast<HWND>(Ship::GetExternalWindowParent())) {
+        h_wnd = CreateWindowW(WINCLASS_NAME, w_title, WS_CHILD | WS_CLIPSIBLINGS, 0, 0, width, height, parent, nullptr,
+                              nullptr, this);
+    } else {
+        h_wnd = CreateWindowW(WINCLASS_NAME, w_title, WS_OVERLAPPEDWINDOW, posX + wr.left, posY + wr.top,
+                              current_width, current_height, nullptr, nullptr, nullptr, this);
+    }
 
     LoadDxgi();
 
@@ -596,7 +606,7 @@ void GfxWindowBackendDXGI::Init(const char* game_name, const char* gfx_api_name,
     // Get refresh rate
     GetMonitorHzPeriod(mMonitor, mDetectedHz, mDisplayPeriod);
 
-    if (start_in_fullscreen) {
+    if (start_in_fullscreen && !Ship::IsWindowEmbedded()) {
         ToggleBorderlessWindowFullScreen(true, false);
     }
 

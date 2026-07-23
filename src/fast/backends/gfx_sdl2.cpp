@@ -12,6 +12,7 @@
 #include "ship/config/ConsoleVariable.h"
 #include "ship/controller/controldeck/ControlDeck.h"
 #include "ship/window/FileDropMgr.h"
+#include "ship/window/WindowEmbedding.h"
 #include "fast/backends/gfx_sdl.h"
 
 #if FOR_WINDOWS
@@ -207,6 +208,10 @@ GfxWindowBackendSDL2::~GfxWindowBackendSDL2() {
 }
 
 void GfxWindowBackendSDL2::SetFullscreenImpl(bool on, bool call_callback) {
+    if (Ship::IsWindowEmbedded()) {
+        return;
+    }
+
     if (mFullScreen == on) {
         return;
     }
@@ -378,6 +383,19 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
     HWND hwnd = wmInfo.info.win.window;
     SDL_WndProc = SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)gfx_sdl_wnd_proc);
     SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
+    if (const auto parent = reinterpret_cast<HWND>(Ship::GetExternalWindowParent())) {
+        LONG_PTR style = GetWindowLongPtr(hwnd, GWL_STYLE);
+        style &= ~(WS_OVERLAPPEDWINDOW | WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
+        style |= WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS;
+        SetWindowLongPtr(hwnd, GWL_STYLE, style);
+        SetParent(hwnd, parent);
+
+        RECT clientRect;
+        if (GetClientRect(parent, &clientRect)) {
+            SetWindowPos(hwnd, nullptr, 0, 0, clientRect.right - clientRect.left, clientRect.bottom - clientRect.top,
+                         SWP_FRAMECHANGED | SWP_NOZORDER);
+        }
+    }
 #endif
     Ship::GuiWindowInitData window_impl;
 

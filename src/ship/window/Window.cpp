@@ -1,4 +1,7 @@
 #include "ship/window/Window.h"
+#include "ship/window/WindowEmbedding.h"
+#include <cstdlib>
+#include <limits>
 #include <string>
 #include <fstream>
 #include <iostream>
@@ -132,4 +135,37 @@ void Window::SetWindowBackend(WindowBackend backend) {
 void Window::AddAvailableWindowBackend(WindowBackend backend) {
     mAvailableWindowBackends->push_back(backend);
 }
+
+uintptr_t GetExternalWindowParent() {
+#ifdef _WIN32
+    static const uintptr_t parent = [] {
+        const char* value = std::getenv("OOTMM_PARENT_HWND");
+        if (value == nullptr || *value == '\0') {
+            return uintptr_t{ 0 };
+        }
+
+        uintptr_t parsed = 0;
+        for (const char* character = value; *character != '\0'; ++character) {
+            if (*character < '0' || *character > '9') {
+                return uintptr_t{ 0 };
+            }
+
+            const auto digit = static_cast<uintptr_t>(*character - '0');
+            if (parsed > (std::numeric_limits<uintptr_t>::max() - digit) / 10) {
+                return uintptr_t{ 0 };
+            }
+            parsed = parsed * 10 + digit;
+        }
+        return parsed;
+    }();
+    return parent;
+#else
+    return 0;
+#endif
+}
+
+bool IsWindowEmbedded() {
+    return GetExternalWindowParent() != 0;
+}
+
 } // namespace Ship
