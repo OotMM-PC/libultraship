@@ -2,6 +2,7 @@
 #include "ship/utils/StringHelper.h"
 #include "ship/debug/CrashHandler.h"
 #include "ship/Context.h"
+#include "ship/window/WindowEmbedding.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -396,6 +397,10 @@ void CrashHandler::PrintStack(CONTEXT* ctx) {
 }
 
 extern "C" LONG WINAPI seh_filter(PEXCEPTION_POINTERS ex) {
+    if (IsWindowEmbedded() && !IsExternalWindowParentAlive()) {
+        return EXCEPTION_EXECUTE_HANDLER;
+    }
+
     char exceptionString[20];
     std::shared_ptr<CrashHandler> crashHandler = Context::GetInstance()->GetCrashHandler();
 

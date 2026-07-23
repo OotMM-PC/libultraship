@@ -10,6 +10,7 @@
 #include "ship/config/Config.h"
 #include "ship/Context.h"
 #include "ship/config/ConsoleVariable.h"
+#include "ship/window/WindowEmbedding.h"
 #include "fast/resource/type/Texture.h"
 #include "ship/resource/File.h"
 #include <stb_image.h>
@@ -124,7 +125,7 @@ void Gui::Init(GuiWindowInitData windowImpl) {
     mImGuiIo->IniFilename = mImGuiIniPath.c_str();
     mImGuiIo->LogFilename = mImGuiLogPath.c_str();
 
-    if (SupportsViewports() &&
+    if (!IsWindowEmbedded() && SupportsViewports() &&
         Ship::Context::GetInstance()->GetConsoleVariables()->GetInteger(CVAR_ENABLE_MULTI_VIEWPORTS, 1)) {
         mImGuiIo->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
     }

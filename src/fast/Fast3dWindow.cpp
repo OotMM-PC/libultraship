@@ -4,6 +4,7 @@
 #include "ship/config/Config.h"
 #include "ship/controller/controldeck/ControlDeck.h"
 #include "ship/config/ConsoleVariable.h"
+#include "ship/window/WindowEmbedding.h"
 #include "fast/interpreter.h"
 #include "fast/backends/gfx_sdl.h"
 #include "fast/backends/gfx_dxgi.h"
@@ -190,6 +191,11 @@ bool Fast3dWindow::IsFrameReady() {
 bool Fast3dWindow::DrawAndRunGraphicsCommands(Gfx* commands, const std::unordered_map<Mtx*, MtxF>& mtxReplacements) {
     std::shared_ptr<Window> wnd = Ship::Context::GetInstance()->GetWindow();
 
+    if (!Ship::IsExternalWindowParentAlive()) {
+        Close();
+        return false;
+    }
+
     // Skip dropped frames
     if (!wnd->IsFrameReady()) {
         return false;
@@ -213,6 +219,10 @@ bool Fast3dWindow::DrawAndRunGraphicsCommands(Gfx* commands, const std::unordere
 }
 
 void Fast3dWindow::HandleEvents() {
+    if (!Ship::IsExternalWindowParentAlive()) {
+        Close();
+        return;
+    }
     mWindowManagerApi->HandleEvents();
 }
 
@@ -327,7 +337,7 @@ bool Fast3dWindow::IsFullscreen() {
 }
 
 bool Fast3dWindow::IsRunning() {
-    return mWindowManagerApi->IsRunning();
+    return Ship::IsExternalWindowParentAlive() && mWindowManagerApi->IsRunning();
 }
 
 uintptr_t Fast3dWindow::GetGfxFrameBuffer() {

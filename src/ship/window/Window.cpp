@@ -9,6 +9,13 @@
 #include "ship/Context.h"
 #include "ship/controller/controldeck/ControlDeck.h"
 
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
+
 #ifdef __APPLE__
 #include "ship/utils/AppleFolderManager.h"
 #endif
@@ -166,6 +173,15 @@ uintptr_t GetExternalWindowParent() {
 
 bool IsWindowEmbedded() {
     return GetExternalWindowParent() != 0;
+}
+
+bool IsExternalWindowParentAlive() {
+#ifdef _WIN32
+    const auto parent = reinterpret_cast<HWND>(GetExternalWindowParent());
+    return parent == nullptr || IsWindow(parent);
+#else
+    return true;
+#endif
 }
 
 } // namespace Ship
