@@ -54,7 +54,7 @@ void GameIpcSession::Stop() {
     mTransitionAccepted = false;
 }
 
-bool GameIpcSession::Pump(GameIpcSettings& settings) {
+bool GameIpcSession::Pump(GameIpcSettings& settings, OotmmInventory* inventory) {
     const bool connected = mClient.IsConnected();
     if (connected && !mWasConnected) {
         mWelcomed = false;
@@ -67,9 +67,18 @@ bool GameIpcSession::Pump(GameIpcSettings& settings) {
     bool settingsChanged = false;
     std::string message;
     while (mClient.TryReceive(message)) {
-        HandleMessage(message, settings, settingsChanged);
+        HandleMessage(message, settings, inventory, settingsChanged);
     }
     return settingsChanged;
+}
+
+bool GameIpcSession::SetDebugInventoryValue(const std::string& id, uint32_t value) {
+    nlohmann::json update{
+        { "type", GameIpcMessageType::InventoryDebugSet },
+        { "itemId", id },
+        { "value", value },
+    };
+    return Send(update.dump());
 }
 
 bool GameIpcSession::AcknowledgeSettings(uint64_t revision) {
@@ -140,7 +149,8 @@ void GameIpcSession::SendHello() {
     mClient.Send(hello.dump());
 }
 
-void GameIpcSession::HandleMessage(const std::string& message, GameIpcSettings& settings, bool& settingsChanged) try {
+void GameIpcSession::HandleMessage(const std::string& message, GameIpcSettings& settings, OotmmInventory* inventory,
+                                   bool& settingsChanged) try {
     const auto root = nlohmann::json::parse(message, nullptr, false);
     if (root.is_discarded() || !root.is_object()) {
         mProtocolError = "Launcher sent invalid IPC JSON";
@@ -195,6 +205,23 @@ void GameIpcSession::HandleMessage(const std::string& message, GameIpcSettings& 
         settings.PendingChecks = values.value("pendingChecks", settings.PendingChecks);
         settings.Revision = revision;
         settingsChanged = true;
+        return;
+    }
+
+    if ((type == GameIpcMessageType::InventorySnapshot || type == GameIpcMessageType::InventoryDelta) &&
+        mWelcomed && inventory != nullptr && root.contains("items") && root["items"].is_object()) {
+        std::unordered_map<std::string, uint32_t> values;
+        for (auto item = root["items"].begin(); item != root["items"].end(); ++item) {
+            if (item.value().is_number_unsigned()) {
+                values.emplace(item.key(), item.value().get<uint32_t>());
+            }
+        }
+        const uint64_t revision = root.value("revision", uint64_t{ 0 });
+        if (type == GameIpcMessageType::InventorySnapshot) {
+            inventory->ApplySnapshot(revision, std::move(values));
+        } else {
+            inventory->ApplyDelta(revision, values);
+        }
         return;
     }
 

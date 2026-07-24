@@ -160,6 +160,7 @@ void OotmmGameState::Reset() {
     mWorldFlags.clear();
     mAllWorldFlags.clear();
     mPreCompletedDungeons.clear();
+    mCustomItems.Reset();
     mEntrances.clear();
     mLastError.clear();
     mActive = false;
@@ -219,6 +220,10 @@ bool OotmmGameState::WorldFlagContains(const std::string& name, const std::strin
 
 bool OotmmGameState::IsDungeonPreCompleted(const std::string& dungeon) const {
     return mPreCompletedDungeons.contains(dungeon);
+}
+
+const OotmmItemCatalog& OotmmGameState::GetCustomItemCatalog() const {
+    return mCustomItems;
 }
 
 const std::vector<OotmmEntranceMapping>& OotmmGameState::GetEntrances() const {
@@ -323,6 +328,23 @@ bool OotmmGameState::LoadSeed() {
                 mPreCompletedDungeons.emplace(dungeon.get<std::string>());
             }
         }
+    }
+
+    const auto addCustomItems = [this](const json& entries) {
+        if (!entries.is_array()) {
+            return;
+        }
+        for (const auto& entry : entries) {
+            if (entry.is_object()) {
+                mCustomItems.Add(ReadString(entry, "itemId"), ReadString(entry, "itemName"));
+            }
+        }
+    };
+    if (const auto placements = root.find("placements"); placements != root.end()) {
+        addCustomItems(*placements);
+    }
+    if (const auto startingItems = root.find("startingItems"); startingItems != root.end()) {
+        addCustomItems(*startingItems);
     }
 
     const auto entrances = root.find("entrances");

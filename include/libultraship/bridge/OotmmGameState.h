@@ -1,5 +1,7 @@
 #pragma once
 
+#include "libultraship/bridge/OotmmInventory.h"
+
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -62,6 +64,7 @@ class OotmmGameState {
     bool HasWorldFlag(const std::string& name) const;
     bool WorldFlagContains(const std::string& name, const std::string& member) const;
     bool IsDungeonPreCompleted(const std::string& dungeon) const;
+    const OotmmItemCatalog& GetCustomItemCatalog() const;
     const std::vector<OotmmEntranceMapping>& GetEntrances() const;
     const OotmmEntranceMapping* FindEntrance(OotmmGame game, uint32_t nativeId) const;
     const std::string& GetLastError() const;
@@ -79,6 +82,7 @@ class OotmmGameState {
     std::unordered_map<std::string, std::unordered_set<std::string>> mWorldFlags;
     std::unordered_set<std::string> mAllWorldFlags;
     std::unordered_set<std::string> mPreCompletedDungeons;
+    OotmmItemCatalog mCustomItems;
     std::vector<OotmmEntranceMapping> mEntrances;
     std::string mLastError;
     bool mActive = false;

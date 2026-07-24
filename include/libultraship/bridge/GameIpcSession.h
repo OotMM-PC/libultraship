@@ -1,6 +1,7 @@
 #pragma once
 
 #include "libultraship/bridge/IpcClient.h"
+#include "libultraship/bridge/OotmmInventory.h"
 
 #include <cstdint>
 #include <deque>
@@ -21,6 +22,9 @@ inline constexpr const char* CheckCollected = "checkCollected";
 inline constexpr const char* CheckAccepted = "checkAccepted";
 inline constexpr const char* DeliverItem = "deliverItem";
 inline constexpr const char* ItemApplied = "itemApplied";
+inline constexpr const char* InventorySnapshot = "inventorySnapshot";
+inline constexpr const char* InventoryDelta = "inventoryDelta";
+inline constexpr const char* InventoryDebugSet = "inventoryDebugSet";
 inline constexpr const char* LocalPlayerPose = "localPlayerPose";
 inline constexpr const char* RemotePlayerPoses = "remotePlayerPoses";
 inline constexpr const char* ModelReady = "modelReady";
@@ -44,8 +48,9 @@ class GameIpcSession {
   public:
     bool Start(std::string game, std::string build);
     void Stop();
-    bool Pump(GameIpcSettings& settings);
+    bool Pump(GameIpcSettings& settings, OotmmInventory* inventory = nullptr);
     bool AcknowledgeSettings(uint64_t revision);
+    bool SetDebugInventoryValue(const std::string& id, uint32_t value);
     bool RequestCrossGameTransition(std::string fromGame, std::string toGame, std::string toEntrance,
                                     std::optional<uint32_t> toNativeId, std::optional<uint32_t> ootAge);
     bool ConsumeTransitionAccepted();
@@ -56,7 +61,8 @@ class GameIpcSession {
 
   private:
     void SendHello();
-    void HandleMessage(const std::string& message, GameIpcSettings& settings, bool& settingsChanged);
+    void HandleMessage(const std::string& message, GameIpcSettings& settings, OotmmInventory* inventory,
+                       bool& settingsChanged);
 
     IpcClient mClient;
     std::string mToken;

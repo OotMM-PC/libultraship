@@ -1,0 +1,252 @@
+#include "libultraship/bridge/OotmmInventory.h"
+
+#include <algorithm>
+#include <array>
+#include <string_view>
+
+namespace Ship {
+
+namespace {
+
+bool StartsWith(std::string_view value, std::string_view prefix) {
+    return value.starts_with(prefix);
+}
+
+bool Contains(std::string_view value, std::string_view part) {
+    return value.find(part) != std::string_view::npos;
+}
+
+bool EndsWith(std::string_view value, std::string_view suffix) {
+    return value.ends_with(suffix);
+}
+
+uint32_t SongNoteMaximum(std::string_view id) {
+    if (Contains(id, "_GORON")) {
+        return 8;
+    }
+    if (Contains(id, "_AWAKENING") || Contains(id, "_EMPTINESS") || Contains(id, "_ZORA") ||
+        Contains(id, "_TP_SHADOW")) {
+        return 7;
+    }
+    if (Contains(id, "_TP_FIRE")) {
+        return 8;
+    }
+    if (Contains(id, "_TP_WATER")) {
+        return 5;
+    }
+    return 6;
+}
+
+bool IsCustomSong(std::string_view id) {
+    static constexpr std::array<std::string_view, 7> kOotSongs = {
+        "OOT_SONG_EMPTINESS", "OOT_SONG_HEALING", "OOT_SONG_SOARING", "OOT_SONG_AWAKENING",
+        "OOT_SONG_GORON", "OOT_SONG_ZORA", "OOT_SONG_ORDER",
+    };
+    if (std::find(kOotSongs.begin(), kOotSongs.end(), id) != kOotSongs.end()) {
+        return true;
+    }
+    return id == "MM_SONG_ZELDA" || id == "MM_SONG_SARIA" || id == "MM_SONG_SUN" ||
+           StartsWith(id, "MM_SONG_TP_");
+}
+
+bool IsCrossGameAbility(std::string_view id) {
+    static constexpr std::array<std::string_view, 39> kItems = {
+        "MM_HAMMER",
+        "MM_SLINGSHOT",
+        "MM_BOOMERANG",
+        "MM_BOOTS_IRON",
+        "MM_BOOTS_HOVER",
+        "MM_TUNIC_GORON",
+        "MM_TUNIC_ZORA",
+        "MM_STONE_OF_AGONY",
+        "MM_SHIELD_DEKU",
+        "MM_SPELL_FIRE",
+        "MM_SPELL_WIND",
+        "MM_SPELL_LOVE",
+        "OOT_GREAT_FAIRY_SWORD",
+        "OOT_POWDER_KEG",
+        "OOT_MASK_BLAST",
+        "OOT_MASK_STONE",
+        "OOT_MASK_KAMARO",
+        "OOT_SWORD_RAZOR",
+        "OOT_SWORD_GILDED",
+        "OOT_BOMBCHU_BAG",
+        "SHARED_HAMMER",
+        "SHARED_SLINGSHOT",
+        "SHARED_BOOMERANG",
+        "SHARED_BOOTS_IRON",
+        "SHARED_BOOTS_HOVER",
+        "SHARED_TUNIC_GORON",
+        "SHARED_TUNIC_ZORA",
+        "SHARED_STONE_OF_AGONY",
+        "SHARED_SPELL_FIRE",
+        "SHARED_SPELL_WIND",
+        "SHARED_SPELL_LOVE",
+        "SHARED_GREAT_FAIRY_SWORD",
+        "SHARED_POWDER_KEG",
+        "SHARED_MASK_BLAST",
+        "SHARED_MASK_STONE",
+        "SHARED_MASK_KAMARO",
+        "SHARED_BOMBCHU_BAG",
+        "SHARED_SHIELD_DEKU",
+        "SHARED_SHIELD_HYLIAN",
+    };
+    return std::find(kItems.begin(), kItems.end(), id) != kItems.end();
+}
+
+std::string DisplayName(std::string id, std::string name) {
+    return name.empty() ? std::move(id) : std::move(name);
+}
+
+} // namespace
+
+void OotmmItemCatalog::Reset() {
+    mItems.clear();
+    mIndex.clear();
+}
+
+bool OotmmItemCatalog::Add(std::string id, std::string name) {
+    if (mIndex.contains(id)) {
+        return false;
+    }
+    auto item = Describe(std::move(id), std::move(name));
+    if (!item.has_value()) {
+        return false;
+    }
+    mIndex.emplace(item->Id, mItems.size());
+    mItems.emplace_back(std::move(*item));
+    return true;
+}
+
+const std::vector<OotmmItemDefinition>& OotmmItemCatalog::GetItems() const {
+    return mItems;
+}
+
+const OotmmItemDefinition* OotmmItemCatalog::Find(const std::string& id) const {
+    const auto item = mIndex.find(id);
+    return item == mIndex.end() ? nullptr : &mItems[item->second];
+}
+
+std::optional<OotmmItemDefinition> OotmmItemCatalog::Describe(std::string id, std::string name) {
+    const std::string_view value = id;
+    OotmmItemDefinition item{
+        .Id = id,
+        .Name = DisplayName(id, std::move(name)),
+    };
+
+    if (Contains(value, "_SOUL_")) {
+        item.Category = "Souls";
+    } else if (Contains(value, "_BUTTON_")) {
+        item.Category = "Ocarina Buttons";
+        item.ModelKind = OotmmItemModelKind::OcarinaButton;
+        if (EndsWith(value, "_C_UP")) {
+            item.ModelVariant = static_cast<uint32_t>(OotmmOcarinaButtonModel::CUp);
+        } else if (EndsWith(value, "_C_DOWN")) {
+            item.ModelVariant = static_cast<uint32_t>(OotmmOcarinaButtonModel::CDown);
+        } else if (EndsWith(value, "_C_LEFT")) {
+            item.ModelVariant = static_cast<uint32_t>(OotmmOcarinaButtonModel::CLeft);
+        } else if (EndsWith(value, "_C_RIGHT")) {
+            item.ModelVariant = static_cast<uint32_t>(OotmmOcarinaButtonModel::CRight);
+        } else {
+            item.ModelVariant = static_cast<uint32_t>(OotmmOcarinaButtonModel::A);
+        }
+    } else if (Contains(value, "_SONG_NOTE_")) {
+        item.Category = "Song Notes";
+        item.Kind = OotmmItemValueKind::Counter;
+        item.MaxValue = SongNoteMaximum(value);
+    } else if (Contains(value, "_RUPEE_SILVER_") || Contains(value, "_POUCH_SILVER_")) {
+        item.Category = "Silver Rupees";
+        item.Kind = OotmmItemValueKind::Counter;
+        item.MaxValue = 99;
+    } else if (Contains(value, "_RUSTY_KEY_")) {
+        item.Category = "Rusty Keys";
+    } else if (Contains(value, "_KEY_RING_") || EndsWith(value, "_SKELETON_KEY")) {
+        item.Category = "Keys";
+    } else if (StartsWith(value, "MM_CLOCK")) {
+        item.Category = "Clocks";
+        item.Kind = value == "MM_CLOCK" ? OotmmItemValueKind::Progressive : OotmmItemValueKind::Toggle;
+        item.MaxValue = value == "MM_CLOCK" ? 6 : 1;
+    } else if (StartsWith(value, "OOT_COIN_")) {
+        item.Category = "Coins";
+        item.Kind = OotmmItemValueKind::Counter;
+        item.MaxValue = 999;
+    } else if (EndsWith(value, "_RUPEE_MAGICAL")) {
+        item.Category = "Silver Rupees";
+        item.Kind = OotmmItemValueKind::Counter;
+        item.MaxValue = 99;
+    } else if (Contains(value, "TRIFORCE")) {
+        item.Category = "Triforce";
+        item.Kind = OotmmItemValueKind::Counter;
+        item.MaxValue = 999;
+    } else if (EndsWith(value, "_PLATINUM_TOKEN")) {
+        item.Category = "Tokens";
+        item.Kind = OotmmItemValueKind::Counter;
+        item.MaxValue = 999;
+    } else if (IsCustomSong(value)) {
+        item.Category = "Songs";
+    } else if (IsCrossGameAbility(value)) {
+        item.Category = "Cross-Game Equipment";
+    } else if (value == "MM_SCALE" || value == "MM_STRENGTH" || value == "SHARED_SCALE" ||
+               value == "SHARED_STRENGTH" || EndsWith(value, "_SPIN_UPGRADE")) {
+        item.Category = "Upgrades";
+    } else if (StartsWith(value, "MM_OWL_")) {
+        item.Category = "Owl Statues";
+    } else if (StartsWith(value, "OOT_FISHING_POND_")) {
+        item.Category = "Fishing";
+        item.Kind = OotmmItemValueKind::Counter;
+        item.MaxValue = 99;
+    } else if (value == "MM_TRANSCENDENT_FAIRY") {
+        item.Category = "Other";
+    } else {
+        return std::nullopt;
+    }
+
+    return item;
+}
+
+void OotmmInventory::Reset() {
+    mRevision = 0;
+    mValues.clear();
+}
+
+void OotmmInventory::ApplySnapshot(uint64_t revision, std::unordered_map<std::string, uint32_t> values) {
+    if (revision < mRevision) {
+        return;
+    }
+    mRevision = revision;
+    mValues = std::move(values);
+}
+
+bool OotmmInventory::ApplyDelta(uint64_t revision, const std::unordered_map<std::string, uint32_t>& values) {
+    if (revision <= mRevision) {
+        return false;
+    }
+    for (const auto& [id, value] : values) {
+        if (value == 0) {
+            mValues.erase(id);
+        } else {
+            mValues[id] = value;
+        }
+    }
+    mRevision = revision;
+    return true;
+}
+
+uint64_t OotmmInventory::GetRevision() const {
+    return mRevision;
+}
+
+uint32_t OotmmInventory::Count(const std::string& id) const {
+    const auto value = mValues.find(id);
+    return value == mValues.end() ? 0 : value->second;
+}
+
+bool OotmmInventory::Has(const std::string& id) const {
+    return Count(id) != 0;
+}
+
+const std::unordered_map<std::string, uint32_t>& OotmmInventory::GetValues() const {
+    return mValues;
+}
+
+} // namespace Ship
