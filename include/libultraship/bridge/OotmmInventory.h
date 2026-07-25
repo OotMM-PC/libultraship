@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -17,6 +18,32 @@ enum class OotmmItemValueKind {
 enum class OotmmItemModelKind {
     None,
     OcarinaButton,
+    Soul,
+    Key,
+    Song,
+    SongNote,
+    SilverRupee,
+    Coin,
+    MagicalRupee,
+    Triforce,
+    PlatinumToken,
+    Clock,
+    Equipment,
+    Upgrade,
+    OwlStatue,
+    Fishing,
+    Fairy,
+    Potion,
+    Rupee,
+    Bombchu,
+    Compass,
+    DungeonMap,
+    Fish,
+    KeyRing,
+    SkeletonKey,
+    MagicJar,
+    Poe,
+    Trap,
 };
 
 enum class OotmmOcarinaButtonModel : uint32_t {
@@ -46,6 +73,10 @@ class OotmmItemCatalog {
     const OotmmItemDefinition* Find(const std::string& id) const;
 
     static std::optional<OotmmItemDefinition> Describe(std::string id, std::string name);
+    static std::optional<OotmmItemDefinition> DescribeModel(std::string id, std::string name);
+    static std::string TrimDestinationSuffix(std::string name, const std::string& destinationGame);
+    static std::string TrimGameSuffix(std::string name);
+    static bool IsTrap(std::string_view itemId);
 
   private:
     std::vector<OotmmItemDefinition> mItems;

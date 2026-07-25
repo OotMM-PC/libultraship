@@ -25,6 +25,8 @@ inline constexpr const char* ItemApplied = "itemApplied";
 inline constexpr const char* InventorySnapshot = "inventorySnapshot";
 inline constexpr const char* InventoryDelta = "inventoryDelta";
 inline constexpr const char* InventoryDebugSet = "inventoryDebugSet";
+inline constexpr const char* DebugPresentItem = "debugPresentItem";
+inline constexpr const char* PresentItem = "presentItem";
 inline constexpr const char* LocalPlayerPose = "localPlayerPose";
 inline constexpr const char* RemotePlayerPoses = "remotePlayerPoses";
 inline constexpr const char* ModelReady = "modelReady";
@@ -44,6 +46,17 @@ struct GameIpcSettings {
     uint32_t PendingChecks = 0;
 };
 
+struct GameIpcItemPresentation {
+    std::string ItemId;
+    std::string ItemName;
+    std::string ItemGame;
+    std::string DestinationGame;
+    uint32_t SourcePlayer = 0;
+    uint32_t RecipientPlayer = 0;
+    uint32_t ViewerPlayer = 0;
+    bool Debug = false;
+};
+
 class GameIpcSession {
   public:
     bool Start(std::string game, std::string build);
@@ -51,6 +64,8 @@ class GameIpcSession {
     bool Pump(GameIpcSettings& settings, OotmmInventory* inventory = nullptr);
     bool AcknowledgeSettings(uint64_t revision);
     bool SetDebugInventoryValue(const std::string& id, uint32_t value);
+    bool RequestDebugItemPresentation(const std::string& id, uint32_t recipientPlayer);
+    bool TryPopItemPresentation(GameIpcItemPresentation& presentation);
     bool RequestCrossGameTransition(std::string fromGame, std::string toGame, std::string toEntrance,
                                     std::optional<uint32_t> toNativeId, std::optional<uint32_t> ootAge);
     bool ConsumeTransitionAccepted();
@@ -70,6 +85,7 @@ class GameIpcSession {
     std::string mBuild;
     std::string mProtocolError;
     std::deque<std::string> mUnhandled;
+    std::deque<GameIpcItemPresentation> mPresentations;
     bool mWasConnected = false;
     bool mWelcomed = false;
     bool mTransitionAccepted = false;

@@ -153,6 +153,8 @@ void OotmmGameState::Reset() {
     mBoot = {};
     mSeedId.clear();
     mNativeSaveTag.clear();
+    mPlayerId = 1;
+    mPlayerCount = 1;
     mStartingGame.reset();
     mBoolSettings.clear();
     mStringSettings.clear();
@@ -161,6 +163,7 @@ void OotmmGameState::Reset() {
     mAllWorldFlags.clear();
     mPreCompletedDungeons.clear();
     mCustomItems.Reset();
+    mSeedItems.clear();
     mEntrances.clear();
     mLastError.clear();
     mActive = false;
@@ -185,6 +188,14 @@ const std::string& OotmmGameState::GetSeedId() const {
 
 const std::string& OotmmGameState::GetNativeSaveTag() const {
     return mNativeSaveTag;
+}
+
+uint32_t OotmmGameState::GetPlayerId() const {
+    return mPlayerId;
+}
+
+uint32_t OotmmGameState::GetPlayerCount() const {
+    return mPlayerCount;
 }
 
 std::optional<OotmmGame> OotmmGameState::GetStartingGame() const {
@@ -224,6 +235,10 @@ bool OotmmGameState::IsDungeonPreCompleted(const std::string& dungeon) const {
 
 const OotmmItemCatalog& OotmmGameState::GetCustomItemCatalog() const {
     return mCustomItems;
+}
+
+const std::vector<OotmmSeedItem>& OotmmGameState::GetSeedItems() const {
+    return mSeedItems;
 }
 
 const std::vector<OotmmEntranceMapping>& OotmmGameState::GetEntrances() const {
@@ -268,20 +283,20 @@ bool OotmmGameState::LoadSeed() {
         return false;
     }
 
-    uint32_t playerId = 1;
-    uint32_t playerCount = 1;
     uint32_t sessionEpoch = 1;
     if (const auto it = root.find("playerId"); it != root.end() && it->is_number_unsigned()) {
-        playerId = it->get<uint32_t>();
+        mPlayerId = it->get<uint32_t>();
     }
     if (const auto it = root.find("playerCount"); it != root.end() && it->is_number_unsigned()) {
-        playerCount = it->get<uint32_t>();
+        mPlayerCount = it->get<uint32_t>();
     }
     if (const auto it = root.find("sessionEpoch"); it != root.end() && it->is_number_unsigned()) {
         sessionEpoch = it->get<uint32_t>();
     }
-    if (playerCount > 1) {
-        mNativeSaveTag += "_p" + std::to_string(playerId);
+    mPlayerCount = std::max(mPlayerCount, 1u);
+    mPlayerId = std::clamp(mPlayerId, 1u, mPlayerCount);
+    if (mPlayerCount > 1) {
+        mNativeSaveTag += "_p" + std::to_string(mPlayerId);
     }
     if (sessionEpoch > 1) {
         mNativeSaveTag += "_e" + std::to_string(sessionEpoch);
@@ -330,21 +345,28 @@ bool OotmmGameState::LoadSeed() {
         }
     }
 
-    const auto addCustomItems = [this](const json& entries) {
+    std::unordered_set<std::string> seedItemIds;
+    const auto addItems = [this, &seedItemIds](const json& entries) {
         if (!entries.is_array()) {
             return;
         }
         for (const auto& entry : entries) {
             if (entry.is_object()) {
-                mCustomItems.Add(ReadString(entry, "itemId"), ReadString(entry, "itemName"));
+                const std::string id = ReadString(entry, "itemId");
+                const std::string name = ReadString(entry, "itemName");
+                const std::string game = ReadString(entry, "itemGame");
+                mCustomItems.Add(id, name);
+                if (!id.empty() && seedItemIds.emplace(id).second) {
+                    mSeedItems.push_back({ id, name.empty() ? id : name, game });
+                }
             }
         }
     };
     if (const auto placements = root.find("placements"); placements != root.end()) {
-        addCustomItems(*placements);
+        addItems(*placements);
     }
     if (const auto startingItems = root.find("startingItems"); startingItems != root.end()) {
-        addCustomItems(*startingItems);
+        addItems(*startingItems);
     }
 
     const auto entrances = root.find("entrances");

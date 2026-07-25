@@ -49,6 +49,7 @@ void GameIpcSession::Stop() {
     mBuild.clear();
     mProtocolError.clear();
     mUnhandled.clear();
+    mPresentations.clear();
     mWasConnected = false;
     mWelcomed = false;
     mTransitionAccepted = false;
@@ -79,6 +80,24 @@ bool GameIpcSession::SetDebugInventoryValue(const std::string& id, uint32_t valu
         { "value", value },
     };
     return Send(update.dump());
+}
+
+bool GameIpcSession::RequestDebugItemPresentation(const std::string& id, uint32_t recipientPlayer) {
+    nlohmann::json request{
+        { "type", GameIpcMessageType::DebugPresentItem },
+        { "itemId", id },
+        { "recipientPlayer", recipientPlayer },
+    };
+    return Send(request.dump());
+}
+
+bool GameIpcSession::TryPopItemPresentation(GameIpcItemPresentation& presentation) {
+    if (mPresentations.empty()) {
+        return false;
+    }
+    presentation = std::move(mPresentations.front());
+    mPresentations.pop_front();
+    return true;
 }
 
 bool GameIpcSession::AcknowledgeSettings(uint64_t revision) {
@@ -222,6 +241,30 @@ void GameIpcSession::HandleMessage(const std::string& message, GameIpcSettings& 
         } else {
             inventory->ApplyDelta(revision, values);
         }
+        return;
+    }
+
+    if (type == GameIpcMessageType::PresentItem && mWelcomed) {
+        const auto itemId = root.value("itemId", "");
+        const auto itemName = root.value("itemName", "");
+        const auto itemGame = root.value("itemGame", "");
+        const auto destinationGame = root.value("destinationGame", "");
+        if (itemId.empty() || itemName.empty() ||
+            (itemGame != "oot" && itemGame != "mm" && itemGame != "shared") ||
+            (destinationGame != "oot" && destinationGame != "mm")) {
+            mProtocolError = "Launcher sent an invalid item presentation";
+            return;
+        }
+        mPresentations.push_back({
+            .ItemId = itemId,
+            .ItemName = itemName,
+            .ItemGame = itemGame,
+            .DestinationGame = destinationGame,
+            .SourcePlayer = root.value("sourcePlayer", uint32_t{ 0 }),
+            .RecipientPlayer = root.value("recipientPlayer", uint32_t{ 0 }),
+            .ViewerPlayer = root.value("viewerPlayer", uint32_t{ 0 }),
+            .Debug = root.value("debug", false),
+        });
         return;
     }
 

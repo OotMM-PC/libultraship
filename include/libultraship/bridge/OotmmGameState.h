@@ -27,6 +27,12 @@ struct OotmmEntranceMapping {
     bool IsCrossGame() const;
 };
 
+struct OotmmSeedItem {
+    std::string Id;
+    std::string Name;
+    std::string Game;
+};
+
 struct OotmmBootConfig {
     std::string SaveId;
     std::string SeedPath;
@@ -57,6 +63,8 @@ class OotmmGameState {
     const OotmmBootConfig& GetBootConfig() const;
     const std::string& GetSeedId() const;
     const std::string& GetNativeSaveTag() const;
+    uint32_t GetPlayerId() const;
+    uint32_t GetPlayerCount() const;
     std::optional<OotmmGame> GetStartingGame() const;
     bool GetBoolSetting(const std::string& name, bool fallback = false) const;
     std::string GetStringSetting(const std::string& name, std::string fallback = {}) const;
@@ -65,6 +73,7 @@ class OotmmGameState {
     bool WorldFlagContains(const std::string& name, const std::string& member) const;
     bool IsDungeonPreCompleted(const std::string& dungeon) const;
     const OotmmItemCatalog& GetCustomItemCatalog() const;
+    const std::vector<OotmmSeedItem>& GetSeedItems() const;
     const std::vector<OotmmEntranceMapping>& GetEntrances() const;
     const OotmmEntranceMapping* FindEntrance(OotmmGame game, uint32_t nativeId) const;
     const std::string& GetLastError() const;
@@ -75,6 +84,8 @@ class OotmmGameState {
     OotmmBootConfig mBoot;
     std::string mSeedId;
     std::string mNativeSaveTag;
+    uint32_t mPlayerId = 1;
+    uint32_t mPlayerCount = 1;
     std::optional<OotmmGame> mStartingGame;
     std::unordered_map<std::string, bool> mBoolSettings;
     std::unordered_map<std::string, std::string> mStringSettings;
@@ -83,6 +94,7 @@ class OotmmGameState {
     std::unordered_set<std::string> mAllWorldFlags;
     std::unordered_set<std::string> mPreCompletedDungeons;
     OotmmItemCatalog mCustomItems;
+    std::vector<OotmmSeedItem> mSeedItems;
     std::vector<OotmmEntranceMapping> mEntrances;
     std::string mLastError;
     bool mActive = false;

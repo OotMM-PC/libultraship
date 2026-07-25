@@ -136,6 +136,7 @@ std::optional<OotmmItemDefinition> OotmmItemCatalog::Describe(std::string id, st
 
     if (Contains(value, "_SOUL_")) {
         item.Category = "Souls";
+        item.ModelKind = OotmmItemModelKind::Soul;
     } else if (Contains(value, "_BUTTON_")) {
         item.Category = "Ocarina Buttons";
         item.ModelKind = OotmmItemModelKind::OcarinaButton;
@@ -154,54 +155,157 @@ std::optional<OotmmItemDefinition> OotmmItemCatalog::Describe(std::string id, st
         item.Category = "Song Notes";
         item.Kind = OotmmItemValueKind::Counter;
         item.MaxValue = SongNoteMaximum(value);
+        item.ModelKind = OotmmItemModelKind::SongNote;
     } else if (Contains(value, "_RUPEE_SILVER_") || Contains(value, "_POUCH_SILVER_")) {
         item.Category = "Silver Rupees";
         item.Kind = OotmmItemValueKind::Counter;
         item.MaxValue = 99;
+        item.ModelKind = OotmmItemModelKind::SilverRupee;
     } else if (Contains(value, "_RUSTY_KEY_")) {
         item.Category = "Rusty Keys";
+        item.ModelKind = OotmmItemModelKind::Key;
     } else if (Contains(value, "_KEY_RING_") || EndsWith(value, "_SKELETON_KEY")) {
         item.Category = "Keys";
+        item.ModelKind = OotmmItemModelKind::Key;
     } else if (StartsWith(value, "MM_CLOCK")) {
         item.Category = "Clocks";
         item.Kind = value == "MM_CLOCK" ? OotmmItemValueKind::Progressive : OotmmItemValueKind::Toggle;
         item.MaxValue = value == "MM_CLOCK" ? 6 : 1;
+        item.ModelKind = OotmmItemModelKind::Clock;
     } else if (StartsWith(value, "OOT_COIN_")) {
         item.Category = "Coins";
         item.Kind = OotmmItemValueKind::Counter;
         item.MaxValue = 999;
+        item.ModelKind = OotmmItemModelKind::Coin;
+        if (EndsWith(value, "_RED")) {
+            item.ModelVariant = 1;
+        } else if (EndsWith(value, "_GREEN")) {
+            item.ModelVariant = 2;
+        } else if (EndsWith(value, "_BLUE")) {
+            item.ModelVariant = 3;
+        }
     } else if (EndsWith(value, "_RUPEE_MAGICAL")) {
         item.Category = "Silver Rupees";
         item.Kind = OotmmItemValueKind::Counter;
         item.MaxValue = 99;
+        item.ModelKind = OotmmItemModelKind::MagicalRupee;
     } else if (Contains(value, "TRIFORCE")) {
         item.Category = "Triforce";
         item.Kind = OotmmItemValueKind::Counter;
         item.MaxValue = 999;
+        item.ModelKind = OotmmItemModelKind::Triforce;
     } else if (EndsWith(value, "_PLATINUM_TOKEN")) {
         item.Category = "Tokens";
         item.Kind = OotmmItemValueKind::Counter;
         item.MaxValue = 999;
+        item.ModelKind = OotmmItemModelKind::PlatinumToken;
     } else if (IsCustomSong(value)) {
         item.Category = "Songs";
+        item.ModelKind = OotmmItemModelKind::Song;
     } else if (IsCrossGameAbility(value)) {
         item.Category = "Cross-Game Equipment";
+        item.ModelKind = OotmmItemModelKind::Equipment;
     } else if (value == "MM_SCALE" || value == "MM_STRENGTH" || value == "SHARED_SCALE" ||
                value == "SHARED_STRENGTH" || EndsWith(value, "_SPIN_UPGRADE")) {
         item.Category = "Upgrades";
+        item.ModelKind = OotmmItemModelKind::Upgrade;
     } else if (StartsWith(value, "MM_OWL_")) {
         item.Category = "Owl Statues";
+        item.ModelKind = OotmmItemModelKind::OwlStatue;
     } else if (StartsWith(value, "OOT_FISHING_POND_")) {
         item.Category = "Fishing";
         item.Kind = OotmmItemValueKind::Counter;
         item.MaxValue = 99;
+        item.ModelKind = OotmmItemModelKind::Fishing;
     } else if (value == "MM_TRANSCENDENT_FAIRY") {
         item.Category = "Other";
+        item.ModelKind = OotmmItemModelKind::Fairy;
     } else {
         return std::nullopt;
     }
 
     return item;
+}
+
+std::optional<OotmmItemDefinition> OotmmItemCatalog::DescribeModel(std::string id, std::string name) {
+    const std::string_view value = id;
+    if (EndsWith(value, "_SKELETON_KEY") || Contains(value, "_KEY_RING")) {
+        OotmmItemDefinition item{
+            .Id = id,
+            .Name = DisplayName(id, std::move(name)),
+            .ModelKind = EndsWith(value, "_SKELETON_KEY") ? OotmmItemModelKind::SkeletonKey
+                                                          : OotmmItemModelKind::KeyRing,
+        };
+        return item;
+    }
+    if (auto custom = Describe(id, name)) {
+        return custom;
+    }
+
+    OotmmItemDefinition item{
+        .Id = id,
+        .Name = DisplayName(id, std::move(name)),
+    };
+
+    if (Contains(value, "_POTION_")) {
+        item.ModelKind = OotmmItemModelKind::Potion;
+        item.ModelVariant = Contains(value, "_GREEN") ? 1 : Contains(value, "_BLUE") ? 2 : 0;
+    } else if (Contains(value, "_RUPEE_")) {
+        item.ModelKind = OotmmItemModelKind::Rupee;
+        item.ModelVariant = Contains(value, "_BLUE")   ? 1
+                            : Contains(value, "_RED")  ? 2
+                            : Contains(value, "_PURPLE") ? 3
+                            : Contains(value, "_SILVER") ? 4
+                            : Contains(value, "_GOLD") || Contains(value, "_HUGE") ? 5
+                                                                                   : 0;
+    } else if (Contains(value, "_BOMBCHU")) {
+        item.ModelKind = OotmmItemModelKind::Bombchu;
+    } else if (Contains(value, "_COMPASS_")) {
+        item.ModelKind = OotmmItemModelKind::Compass;
+    } else if (Contains(value, "_WORLD_MAP_") || Contains(value, "_MAP_")) {
+        item.ModelKind = OotmmItemModelKind::DungeonMap;
+    } else if (EndsWith(value, "_FISH")) {
+        item.ModelKind = OotmmItemModelKind::Fish;
+    } else if (Contains(value, "_MAGIC_JAR_")) {
+        item.ModelKind = OotmmItemModelKind::MagicJar;
+        item.ModelVariant = Contains(value, "_LARGE") ? 1 : 0;
+    } else if (EndsWith(value, "_BOTTLE_POE") || EndsWith(value, "_POE")) {
+        item.ModelKind = OotmmItemModelKind::Poe;
+    } else if (Contains(value, "_STRAY_FAIRY_")) {
+        item.ModelKind = OotmmItemModelKind::Fairy;
+    } else if (Contains(value, "_TRAP_")) {
+        item.ModelKind = OotmmItemModelKind::Trap;
+        item.ModelVariant = Contains(value, "_FIRE")         ? 1
+                            : Contains(value, "_SHOCK")      ? 2
+                            : Contains(value, "_DRAIN")      ? 3
+                            : Contains(value, "_ANTI_MAGIC") ? 4
+                            : Contains(value, "_KNOCKBACK")  ? 5
+                            : Contains(value, "_RUPOOR")     ? 6
+                                                             : 0;
+    } else {
+        return std::nullopt;
+    }
+
+    return item;
+}
+
+std::string OotmmItemCatalog::TrimDestinationSuffix(std::string name, const std::string& destinationGame) {
+    const std::string suffix = " (" + destinationGame + ")";
+    if (name.ends_with(suffix)) {
+        name.resize(name.size() - suffix.size());
+    }
+    return name;
+}
+
+std::string OotmmItemCatalog::TrimGameSuffix(std::string name) {
+    for (const std::string& game : { "MM", "OoT", "OOT" }) {
+        name = TrimDestinationSuffix(std::move(name), game);
+    }
+    return name;
+}
+
+bool OotmmItemCatalog::IsTrap(std::string_view itemId) {
+    return itemId.find("_TRAP_") != std::string_view::npos;
 }
 
 void OotmmInventory::Reset() {
