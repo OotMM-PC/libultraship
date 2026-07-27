@@ -69,6 +69,8 @@ class OotmmGameState {
     bool GetBoolSetting(const std::string& name, bool fallback = false) const;
     std::string GetStringSetting(const std::string& name, std::string fallback = {}) const;
     int GetIntSetting(const std::string& name, int fallback = 0) const;
+    /// Frames the Blast Mask takes to recharge, from the seed's blastMaskCooldown setting.
+    uint16_t GetBlastMaskCooldownFrames() const;
     bool HasWorldFlag(const std::string& name) const;
     bool WorldFlagContains(const std::string& name, const std::string& member) const;
     bool IsDungeonPreCompleted(const std::string& dungeon) const;

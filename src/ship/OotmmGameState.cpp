@@ -207,6 +207,27 @@ bool OotmmGameState::GetBoolSetting(const std::string& name, bool fallback) cons
     return it == mBoolSettings.end() ? fallback : it->second;
 }
 
+uint16_t OotmmGameState::GetBlastMaskCooldownFrames() const {
+    // The frame counts OoTMM's own patch uses for each setting value.
+    const std::string value = GetStringSetting("blastMaskCooldown", "default");
+    if (value == "instant") {
+        return 0x001;
+    }
+    if (value == "veryshort") {
+        return 0x020;
+    }
+    if (value == "short") {
+        return 0x080;
+    }
+    if (value == "long") {
+        return 0x200;
+    }
+    if (value == "verylong") {
+        return 0x400;
+    }
+    return 0x136;
+}
+
 std::string OotmmGameState::GetStringSetting(const std::string& name, std::string fallback) const {
     const auto it = mStringSettings.find(name);
     return it == mStringSettings.end() ? std::move(fallback) : it->second;
