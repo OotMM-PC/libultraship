@@ -311,8 +311,16 @@ bool OotmmGameState::LoadSeed() {
     if (const auto it = root.find("playerCount"); it != root.end() && it->is_number_unsigned()) {
         mPlayerCount = it->get<uint32_t>();
     }
-    if (const auto it = root.find("sessionEpoch"); it != root.end() && it->is_number_unsigned()) {
-        sessionEpoch = it->get<uint32_t>();
+    if (const auto it = root.find("sessionEpoch"); it != root.end()) {
+        if (it->is_number_unsigned()) {
+            sessionEpoch = it->get<uint32_t>();
+        } else if (it->is_string()) {
+            // The launcher accepts the string form too; the save tag must agree with it.
+            const std::string text = it->get<std::string>();
+            if (!text.empty() && text.find_first_not_of("0123456789") == std::string::npos) {
+                sessionEpoch = static_cast<uint32_t>(std::strtoull(text.c_str(), nullptr, 10));
+            }
+        }
     }
     mPlayerCount = std::max(mPlayerCount, 1u);
     mPlayerId = std::clamp(mPlayerId, 1u, mPlayerCount);

@@ -1,5 +1,7 @@
 #include "libultraship/bridge/OotmmInventory.h"
 
+#include "libultraship/bridge/OotmmItemGrant.h"
+
 #include <algorithm>
 #include <array>
 #include <string_view>
@@ -38,6 +40,14 @@ uint32_t SongNoteMaximum(std::string_view id) {
 }
 
 bool IsCustomSong(std::string_view id) {
+    if (id.starts_with("SHARED_SONG_")) {
+        const std::string_view tail = id.substr(7);
+        std::string oot("OOT_");
+        oot += tail;
+        std::string mm("MM_");
+        mm += tail;
+        return IsCustomSong(oot) || IsCustomSong(mm);
+    }
     static constexpr std::array<std::string_view, 7> kOotSongs = {
         "OOT_SONG_EMPTINESS", "OOT_SONG_HEALING", "OOT_SONG_SOARING", "OOT_SONG_AWAKENING",
         "OOT_SONG_GORON", "OOT_SONG_ZORA", "OOT_SONG_ORDER",
@@ -50,7 +60,15 @@ bool IsCustomSong(std::string_view id) {
 }
 
 bool IsCrossGameAbility(std::string_view id) {
-    static constexpr std::array<std::string_view, 39> kItems = {
+    static constexpr std::array<std::string_view, 47> kItems = {
+        "MM_MASK_GERUDO",
+        "MM_MASK_SKULL",
+        "MM_MASK_SPOOKY",
+        "MM_BOTTLE_RUTO_LETTER",
+        "SHARED_MASK_GERUDO",
+        "SHARED_MASK_SKULL",
+        "SHARED_MASK_SPOOKY",
+        "SHARED_BOTTLE_RUTO_LETTER",
         "MM_HAMMER",
         "MM_SLINGSHOT",
         "MM_BOOMERANG",
@@ -156,10 +174,18 @@ std::optional<OotmmItemDefinition> OotmmItemCatalog::Describe(std::string id, st
         item.Kind = OotmmItemValueKind::Counter;
         item.MaxValue = SongNoteMaximum(value);
         item.ModelKind = OotmmItemModelKind::SongNote;
-    } else if (Contains(value, "_RUPEE_SILVER_") || Contains(value, "_POUCH_SILVER_")) {
+    } else if (Contains(value, "_POUCH_SILVER_")) {
+        item.Category = "Silver Rupees";
+        item.Kind = OotmmItemValueKind::Toggle;
+        item.MaxValue = 1;
+        item.ModelKind = OotmmItemModelKind::SilverRupee;
+    } else if (Contains(value, "_RUPEE_SILVER_")) {
+        constexpr std::string_view marker = "_RUPEE_SILVER_";
+        const std::string_view puzzle =
+            std::string_view(value).substr(value.find(marker) + marker.size());
         item.Category = "Silver Rupees";
         item.Kind = OotmmItemValueKind::Counter;
-        item.MaxValue = 99;
+        item.MaxValue = std::max(OotmmSilverRupees::MaxRequired(puzzle), 1u);
         item.ModelKind = OotmmItemModelKind::SilverRupee;
     } else if (Contains(value, "_RUSTY_KEY_")) {
         item.Category = "Rusty Keys";
@@ -186,8 +212,8 @@ std::optional<OotmmItemDefinition> OotmmItemCatalog::Describe(std::string id, st
         }
     } else if (EndsWith(value, "_RUPEE_MAGICAL")) {
         item.Category = "Silver Rupees";
-        item.Kind = OotmmItemValueKind::Counter;
-        item.MaxValue = 99;
+        item.Kind = OotmmItemValueKind::Toggle;
+        item.MaxValue = 1;
         item.ModelKind = OotmmItemModelKind::MagicalRupee;
     } else if (Contains(value, "TRIFORCE")) {
         item.Category = "Triforce";
@@ -209,6 +235,10 @@ std::optional<OotmmItemDefinition> OotmmItemCatalog::Describe(std::string id, st
                value == "SHARED_STRENGTH" || EndsWith(value, "_SPIN_UPGRADE")) {
         item.Category = "Upgrades";
         item.ModelKind = OotmmItemModelKind::Upgrade;
+        if (!EndsWith(value, "_SPIN_UPGRADE")) {
+            item.Kind = OotmmItemValueKind::Progressive;
+            item.MaxValue = 3;
+        }
     } else if (StartsWith(value, "MM_OWL_")) {
         item.Category = "Owl Statues";
         item.ModelKind = OotmmItemModelKind::OwlStatue;

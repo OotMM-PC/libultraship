@@ -16,6 +16,7 @@ class OotmmAppliedLedger {
 
     uint32_t Applied(const std::string& key) const;
     void SetApplied(const std::string& key, uint32_t value);
+    void Erase(const std::string& key);
     bool Has(const std::string& key) const;
 
   private:

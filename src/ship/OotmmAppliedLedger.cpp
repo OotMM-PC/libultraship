@@ -64,6 +64,10 @@ void OotmmAppliedLedger::SetApplied(const std::string& key, uint32_t value) {
     mApplied[key] = value;
 }
 
+void OotmmAppliedLedger::Erase(const std::string& key) {
+    mApplied.erase(key);
+}
+
 bool OotmmAppliedLedger::Has(const std::string& key) const {
     return mApplied.find(key) != mApplied.end();
 }

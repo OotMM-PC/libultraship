@@ -16,6 +16,7 @@ enum class OotmmGrantGame {
 enum class OotmmGrantKind {
     Equipment,
     Upgrade,
+    SpinUpgrade,
     QuestFlag,
     DungeonItem,
     SmallKeyRing,
@@ -47,6 +48,15 @@ struct OotmmGrantOp {
     OotmmGrantGame Game = OotmmGrantGame::Shared;
     std::string Slot;
     uint32_t Amount = 0;
+};
+
+class OotmmSilverRupees {
+  public:
+    /// Rupees the puzzle needs in the given quest, or 0 when it has none there.
+    static uint32_t Required(std::string_view suffix, bool masterQuest);
+    static uint32_t MaxRequired(std::string_view suffix);
+    /// Every puzzle suffix, in table order.
+    static std::vector<std::string_view> All();
 };
 
 class OotmmItemGrant {

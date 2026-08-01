@@ -1,6 +1,7 @@
 #include "libultraship/bridge/OotmmItemGrant.h"
 
 #include <algorithm>
+#include <iterator>
 
 namespace Ship {
 
@@ -14,7 +15,69 @@ OotmmGrantOp Op(OotmmGrantKind kind, OotmmGrantGame game, std::string_view slot,
     return OotmmGrantOp{ kind, game, std::string(slot), amount };
 }
 
+struct SilverRupeePuzzle {
+    std::string_view Suffix;
+    uint32_t Vanilla;
+    uint32_t MasterQuest;
+};
+
+constexpr SilverRupeePuzzle kSilverRupeePuzzles[] = {
+    { "DC", 0, 5 },
+    { "BOTW", 5, 0 },
+    { "SPIRIT_CHILD", 5, 0 },
+    { "SPIRIT_SUN", 5, 0 },
+    { "SPIRIT_BOULDERS", 5, 0 },
+    { "SPIRIT_LOBBY", 0, 5 },
+    { "SPIRIT_ADULT", 0, 5 },
+    { "SHADOW_SCYTHE", 5, 5 },
+    { "SHADOW_PIT", 5, 5 },
+    { "SHADOW_SPIKES", 5, 10 },
+    { "SHADOW_BLADES", 0, 10 },
+    { "IC_SCYTHE", 5, 0 },
+    { "IC_BLOCK", 5, 0 },
+    { "GTG_SLOPES", 5, 5 },
+    { "GTG_LAVA", 5, 6 },
+    { "GTG_WATER", 5, 3 },
+    { "GANON_SPIRIT", 5, 0 },
+    { "GANON_LIGHT", 5, 0 },
+    { "GANON_FIRE", 5, 5 },
+    { "GANON_FOREST", 5, 0 },
+    { "GANON_SHADOW", 0, 5 },
+    { "GANON_WATER", 0, 5 },
+};
+
+const SilverRupeePuzzle* FindSilverRupeePuzzle(std::string_view suffix) {
+    for (const SilverRupeePuzzle& puzzle : kSilverRupeePuzzles) {
+        if (puzzle.Suffix == suffix) {
+            return &puzzle;
+        }
+    }
+    return nullptr;
+}
+
 } // namespace
+
+uint32_t OotmmSilverRupees::Required(std::string_view suffix, bool masterQuest) {
+    const SilverRupeePuzzle* puzzle = FindSilverRupeePuzzle(suffix);
+    if (puzzle == nullptr) {
+        return 0;
+    }
+    return masterQuest ? puzzle->MasterQuest : puzzle->Vanilla;
+}
+
+uint32_t OotmmSilverRupees::MaxRequired(std::string_view suffix) {
+    const SilverRupeePuzzle* puzzle = FindSilverRupeePuzzle(suffix);
+    return puzzle == nullptr ? 0 : std::max(puzzle->Vanilla, puzzle->MasterQuest);
+}
+
+std::vector<std::string_view> OotmmSilverRupees::All() {
+    std::vector<std::string_view> suffixes;
+    suffixes.reserve(std::size(kSilverRupeePuzzles));
+    for (const SilverRupeePuzzle& puzzle : kSilverRupeePuzzles) {
+        suffixes.push_back(puzzle.Suffix);
+    }
+    return suffixes;
+}
 
 OotmmGrantGame OotmmItemGrant::GameOf(std::string_view itemId) {
     if (itemId.starts_with("OOT_")) {
@@ -43,10 +106,14 @@ bool OotmmItemGrant::IsInventoryBacked(OotmmGrantKind kind) {
     switch (kind) {
         case OotmmGrantKind::Soul:
         case OotmmGrantKind::RustyKey:
+        case OotmmGrantKind::SkeletonKey:
+        case OotmmGrantKind::SpinUpgrade:
         case OotmmGrantKind::OcarinaButton:
         case OotmmGrantKind::SilverRupee:
         case OotmmGrantKind::Triforce:
         case OotmmGrantKind::Coin:
+        case OotmmGrantKind::Clock:
+        case OotmmGrantKind::OwlStatue:
         case OotmmGrantKind::Fishing:
         case OotmmGrantKind::Trap:
             return true;
@@ -76,7 +143,9 @@ std::vector<OotmmGrantOp> OotmmItemGrant::Resolve(std::string_view itemId, uint3
         ops.push_back(Op(OotmmGrantKind::OcarinaButton, game, suffix, count));
         return ops;
     }
-    if (Contains(itemId, "_RUPEE_SILVER_") || Contains(itemId, "_POUCH_SILVER_")) {
+    // Must precede the generic _RUPEE branch, which would spend it as wallet money.
+    if (Contains(itemId, "_RUPEE_SILVER_") || Contains(itemId, "_POUCH_SILVER_") ||
+        suffix == "RUPEE_MAGICAL") {
         ops.push_back(Op(OotmmGrantKind::SilverRupee, game, suffix, count));
         return ops;
     }
@@ -89,7 +158,7 @@ std::vector<OotmmGrantOp> OotmmItemGrant::Resolve(std::string_view itemId, uint3
         return ops;
     }
     if (Contains(itemId, "_WORLD_MAP_")) {
-        ops.push_back(Op(OotmmGrantKind::Map, game, suffix, 1));
+        ops.push_back(Op(OotmmGrantKind::Map, OotmmGrantGame::Mm, suffix, 1));
         return ops;
     }
     if (Contains(itemId, "_MAP_") || Contains(itemId, "_COMPASS_") ||
@@ -99,11 +168,11 @@ std::vector<OotmmGrantOp> OotmmItemGrant::Resolve(std::string_view itemId, uint3
         return ops;
     }
     if (Contains(itemId, "_OWL_")) {
-        ops.push_back(Op(OotmmGrantKind::OwlStatue, game, suffix, 1));
+        ops.push_back(Op(OotmmGrantKind::OwlStatue, OotmmGrantGame::Mm, suffix, 1));
         return ops;
     }
     if (suffix.starts_with("CLOCK")) {
-        ops.push_back(Op(OotmmGrantKind::Clock, game, suffix, count));
+        ops.push_back(Op(OotmmGrantKind::Clock, OotmmGrantGame::Mm, suffix, count));
         return ops;
     }
     if (Contains(itemId, "TRIFORCE")) {
@@ -160,6 +229,10 @@ std::vector<OotmmGrantOp> OotmmItemGrant::Resolve(std::string_view itemId, uint3
     if (Contains(itemId, "_MEDALLION_") || Contains(itemId, "_STONE_") ||
         Contains(itemId, "_REMAINS_")) {
         ops.push_back(Op(OotmmGrantKind::QuestFlag, game, suffix, 1));
+        return ops;
+    }
+    if (suffix == "SPIN_UPGRADE") {
+        ops.push_back(Op(OotmmGrantKind::SpinUpgrade, game, suffix, 1));
         return ops;
     }
     if (Contains(itemId, "_UPGRADE") || Contains(itemId, "_WALLET") ||
