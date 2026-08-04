@@ -2,11 +2,14 @@
 
 #include "libultraship/bridge/IpcClient.h"
 #include "libultraship/bridge/OotmmInventory.h"
+#include "libultraship/bridge/OotmmPresence.h"
 
+#include <chrono>
 #include <cstdint>
 #include <deque>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace Ship {
 
@@ -29,6 +32,7 @@ inline constexpr const char* DebugPresentItem = "debugPresentItem";
 inline constexpr const char* PresentItem = "presentItem";
 inline constexpr const char* LocalPlayerPose = "localPlayerPose";
 inline constexpr const char* RemotePlayerPoses = "remotePlayerPoses";
+inline constexpr const char* PvpHit = "pvpHit";
 inline constexpr const char* ModelReady = "modelReady";
 inline constexpr const char* ModelMounted = "modelMounted";
 inline constexpr const char* CrossGameTransition = "crossGameTransition";
@@ -69,6 +73,15 @@ class GameIpcSession {
     bool RequestCrossGameTransition(std::string fromGame, std::string toGame, std::string toEntrance,
                                     std::optional<uint32_t> toNativeId, std::optional<uint32_t> ootAge);
     bool ConsumeTransitionAccepted();
+
+    /// True once the launcher is publishing rosters; solo sessions never see one.
+    bool PresenceActive() const;
+    /// Lossy: an unchanged pose is dropped rather than framed.
+    bool SendPlayerPose(const OotmmPlayerPose& pose);
+    bool SendPvpHit(const OotmmPvpHit& hit);
+    /// Poses are last-value; hits accumulate so none is lost between game ticks.
+    bool TakeRemotePresence(std::vector<OotmmPlayerPose>& poses, std::vector<OotmmPvpHit>& hits);
+
     bool Send(std::string message);
     bool TryReceive(std::string& message);
     bool IsConnected() const;
@@ -89,6 +102,16 @@ class GameIpcSession {
     bool mWasConnected = false;
     bool mWelcomed = false;
     bool mTransitionAccepted = false;
+
+    // Held unparsed until the logic tick consumes it; discarding an unread roster is safe
+    // because poses are last-value.
+    std::string mRemoteRoster;
+    bool mRemoteRosterFresh = false;
+    std::deque<OotmmPvpHit> mRemoteHits;
+    // Wall-clock, not a pump count: the pump runs per rendered frame, so a count would expire
+    // sooner on a fast display.
+    std::chrono::steady_clock::time_point mPresenceUntil{};
+    std::string mLastPoseSent;
 };
 
 } // namespace Ship

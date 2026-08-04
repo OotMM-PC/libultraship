@@ -17,6 +17,8 @@ namespace {
 constexpr int ProtocolMajor = 1;
 constexpr int ProtocolMinor = 0;
 constexpr size_t MaxUnhandledMessages = 1024;
+constexpr size_t MaxQueuedHits = 64;
+constexpr char kRosterPrefix[] = "{\"type\":\"remotePlayerPoses\"";
 
 uint32_t ProcessId() {
 #ifdef _WIN32
@@ -53,6 +55,11 @@ void GameIpcSession::Stop() {
     mWasConnected = false;
     mWelcomed = false;
     mTransitionAccepted = false;
+    mRemoteRoster.clear();
+    mRemoteHits.clear();
+    mRemoteRosterFresh = false;
+    mPresenceUntil = {};
+    mLastPoseSent.clear();
 }
 
 bool GameIpcSession::Pump(GameIpcSettings& settings, OotmmInventory* inventory) {
@@ -71,6 +78,49 @@ bool GameIpcSession::Pump(GameIpcSettings& settings, OotmmInventory* inventory) 
         HandleMessage(message, settings, inventory, settingsChanged);
     }
     return settingsChanged;
+}
+
+bool GameIpcSession::PresenceActive() const {
+    return std::chrono::steady_clock::now() < mPresenceUntil;
+}
+
+bool GameIpcSession::SendPlayerPose(const OotmmPlayerPose& pose) {
+    std::string body = OotmmPresenceIo::SerializePose(pose);
+    if (body == mLastPoseSent) {
+        return true;
+    }
+
+    std::string envelope;
+    envelope.reserve(body.size() + 32);
+    envelope.append("{\"type\":\"").append(GameIpcMessageType::LocalPlayerPose).append("\",\"pose\":");
+    envelope.append(body).append("}");
+    if (!Send(std::move(envelope))) {
+        return false;
+    }
+
+    mLastPoseSent = std::move(body);
+    return true;
+}
+
+bool GameIpcSession::SendPvpHit(const OotmmPvpHit& hit) {
+    const std::string body = OotmmPresenceIo::SerializePvpHit(hit);
+    std::string envelope;
+    envelope.reserve(body.size() + 32);
+    envelope.append("{\"type\":\"").append(GameIpcMessageType::PvpHit).append("\",\"hit\":");
+    envelope.append(body).append("}");
+    return Send(std::move(envelope));
+}
+
+bool GameIpcSession::TakeRemotePresence(std::vector<OotmmPlayerPose>& poses, std::vector<OotmmPvpHit>& hits) {
+    hits.assign(mRemoteHits.begin(), mRemoteHits.end());
+    mRemoteHits.clear();
+    if (!mRemoteRosterFresh) {
+        return !hits.empty();
+    }
+
+    mRemoteRosterFresh = false;
+    OotmmPresenceIo::ParseRoster(mRemoteRoster, poses);
+    return true;
 }
 
 bool GameIpcSession::SetDebugInventoryValue(const std::string& id, uint32_t value) {
@@ -170,6 +220,15 @@ void GameIpcSession::SendHello() {
 
 void GameIpcSession::HandleMessage(const std::string& message, GameIpcSettings& settings, OotmmInventory* inventory,
                                    bool& settingsChanged) try {
+    // Matched by prefix and stashed unparsed to keep this off the render path;
+    // BuildRemotePlayerPoses always emits type first, so the match is exact.
+    if (message.compare(0, sizeof(kRosterPrefix) - 1, kRosterPrefix) == 0) {
+        mPresenceUntil = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+        mRemoteRoster = message;
+        mRemoteRosterFresh = true;
+        return;
+    }
+
     const auto root = nlohmann::json::parse(message, nullptr, false);
     if (root.is_discarded() || !root.is_object()) {
         mProtocolError = "Launcher sent invalid IPC JSON";
@@ -265,6 +324,16 @@ void GameIpcSession::HandleMessage(const std::string& message, GameIpcSettings& 
             .ViewerPlayer = root.value("viewerPlayer", uint32_t{ 0 }),
             .Debug = root.value("debug", false),
         });
+        return;
+    }
+
+    if (type == GameIpcMessageType::PvpHit) {
+        if (const auto body = root.find("hit"); body != root.end() && body->is_object()) {
+            if (auto hit = OotmmPresenceIo::ParsePvpHit(body->dump());
+                hit.has_value() && mRemoteHits.size() < MaxQueuedHits) {
+                mRemoteHits.push_back(*hit);
+            }
+        }
         return;
     }
 
