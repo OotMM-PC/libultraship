@@ -27,6 +27,14 @@ std::filesystem::path ManifestPath(const std::string& modsDirectory) {
     return std::filesystem::path(modsDirectory) / "loadorder.txt";
 }
 
+// Launcher-generated archives (ported local models, co-op fills) never appear in the manifest
+// and must win anyway: they mount after everything, ranked or not.
+bool IsPinnedLast(const std::string& fileOrPath) {
+    const size_t slash = fileOrPath.find_last_of("/\\");
+    const std::string name = slash == std::string::npos ? fileOrPath : fileOrPath.substr(slash + 1);
+    return name.rfind("zz_localmodel_", 0) == 0 || name.rfind("zz_coop_", 0) == 0;
+}
+
 } // namespace
 
 std::vector<std::string> ModLoadOrder::Read(const std::string& modsDirectory) {
@@ -78,12 +86,13 @@ void ModLoadOrder::SortForMounting(std::vector<std::string>& filesOrPaths, const
     }
 
     const std::vector<std::string> order = Read(modsDirectory);
-    if (order.empty()) {
-        return;
-    }
-
     std::stable_sort(filesOrPaths.begin(), filesOrPaths.end(),
                      [&order](const std::string& a, const std::string& b) {
+                         const bool pinnedA = IsPinnedLast(a);
+                         const bool pinnedB = IsPinnedLast(b);
+                         if (pinnedA != pinnedB) {
+                             return !pinnedA;
+                         }
                          const int rankA = RankOf(order, a);
                          const int rankB = RankOf(order, b);
                          if ((rankA < 0) != (rankB < 0)) {
