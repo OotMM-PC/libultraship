@@ -21,6 +21,9 @@ struct OotmmPlayerPose {
     int MoveFlags = 0;
     // OoT: age (0 adult, 1 child). MM: transformation (0 FD .. 4 Human).
     int Form = 0;
+    // MM human form's model source: 0 vanilla, 1 ported OoT child, 2 ported OoT adult.
+    // Receivers pick the puppet's skeleton and face textures from it.
+    int HumanModel = 0;
     uint32_t Seq = 0;
     // "" = the skeleton's own limb DL, "-" = draw nothing.
     std::string DlLeftHand;

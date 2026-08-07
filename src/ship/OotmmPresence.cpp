@@ -50,6 +50,7 @@ std::optional<OotmmPlayerPose> ParsePoseObject(const nlohmann::json& root) {
     pose.YOffset = static_cast<float>(ReadNumber(root, "yOff", 0.0));
     pose.MoveFlags = ReadInt(root, "mvf", 0);
     pose.Form = ReadInt(root, "form", 0);
+    pose.HumanModel = ReadInt(root, "hm", 0);
     pose.Seq = static_cast<uint32_t>(ReadNumber(root, "seq", 0));
     pose.DlLeftHand = ReadString(root, "dlL");
     pose.DlRightHand = ReadString(root, "dlR");
@@ -94,6 +95,7 @@ std::string OotmmPresenceIo::SerializePose(const OotmmPlayerPose& pose) {
     out << ",\"yOff\":" << pose.YOffset;
     out << ",\"mvf\":" << pose.MoveFlags;
     out << ",\"form\":" << pose.Form;
+    if (pose.HumanModel != 0) out << ",\"hm\":" << pose.HumanModel;
     out << ",\"seq\":" << pose.Seq;
     if (!pose.DlLeftHand.empty()) out << ",\"dlL\":" << Escape(pose.DlLeftHand);
     if (!pose.DlRightHand.empty()) out << ",\"dlR\":" << Escape(pose.DlRightHand);
