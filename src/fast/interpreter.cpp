@@ -905,6 +905,13 @@ void Interpreter::ImportTextureRaw(int tile, bool importReplacement) {
             resultOrigLineSize *= 2;
             break;
     }
+    // A zero line size means the display list drew with a half-configured tile; skipping the
+    // import renders that draw wrong instead of dividing by zero below.
+    if (resultOrigLineSize == 0) {
+        SPDLOG_ERROR("ImportTextureRaw: tile {} has zero line size (texture: {})", tile,
+                     metadata->resource != nullptr ? metadata->resource->GetInitData()->Path : "<raw>");
+        return;
+    }
     uint32_t resultOrigHeight = numOriginallyLoadedBytes / resultOrigLineSize;
     uint32_t resultNewLineSize = resultOrigLineSize * metadata->h_byte_scale;
     uint32_t resultNewHeight = resultOrigHeight * metadata->v_pixel_scale;
