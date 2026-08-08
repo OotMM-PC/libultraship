@@ -33,6 +33,25 @@ struct OotmmSeedItem {
     std::string Game;
 };
 
+struct OotmmPlacement {
+    OotmmGame CheckGame = OotmmGame::Oot;
+    std::string CheckId;
+    std::string CheckName;
+    std::optional<uint32_t> CheckScene;
+    std::string CheckType;
+    std::optional<uint32_t> CheckNativeId;
+    std::optional<uint32_t> CheckFlag;
+    std::string ItemGame;
+    std::string ItemId;
+    std::string ItemName;
+    // The decoy the location displays until collected; empty = show the real item.
+    std::string CloakItemId;
+    std::string CloakItemName;
+    uint32_t OwnerPlayer = 0;
+    uint32_t SourcePlayer = 0;
+    bool Major = false;
+};
+
 struct OotmmBootConfig {
     std::string SaveId;
     std::string SeedPath;
@@ -78,6 +97,11 @@ class OotmmGameState {
     const std::vector<OotmmSeedItem>& GetSeedItems() const;
     const std::vector<OotmmEntranceMapping>& GetEntrances() const;
     const OotmmEntranceMapping* FindEntrance(OotmmGame game, uint32_t nativeId) const;
+    const std::vector<OotmmPlacement>& GetPlacements() const;
+    const OotmmPlacement* FindCheckById(OotmmGame game, const std::string& checkId) const;
+    /// The check at an in-world location, keyed the way the seed identifies it.
+    const OotmmPlacement* FindCheck(OotmmGame game, uint32_t scene, const std::string& type,
+                                    uint32_t flag) const;
     const std::string& GetLastError() const;
 
   private:
@@ -98,6 +122,9 @@ class OotmmGameState {
     OotmmItemCatalog mCustomItems;
     std::vector<OotmmSeedItem> mSeedItems;
     std::vector<OotmmEntranceMapping> mEntrances;
+    std::vector<OotmmPlacement> mPlacements;
+    std::unordered_map<std::string, size_t> mPlacementsById;
+    std::unordered_map<std::string, size_t> mPlacementsByLocation;
     std::string mLastError;
     bool mActive = false;
     bool mHasSeed = false;

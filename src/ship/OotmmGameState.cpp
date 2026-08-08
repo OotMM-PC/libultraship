@@ -165,6 +165,9 @@ void OotmmGameState::Reset() {
     mCustomItems.Reset();
     mSeedItems.clear();
     mEntrances.clear();
+    mPlacements.clear();
+    mPlacementsById.clear();
+    mPlacementsByLocation.clear();
     mLastError.clear();
     mActive = false;
     mHasSeed = false;
@@ -271,6 +274,24 @@ const OotmmEntranceMapping* OotmmGameState::FindEntrance(OotmmGame game, uint32_
         return entrance.FromGame == game && entrance.FromNativeId == nativeId;
     });
     return mapping == mEntrances.end() ? nullptr : &*mapping;
+}
+
+const std::vector<OotmmPlacement>& OotmmGameState::GetPlacements() const {
+    return mPlacements;
+}
+
+const OotmmPlacement* OotmmGameState::FindCheckById(OotmmGame game, const std::string& checkId) const {
+    const char gameTag = game == OotmmGame::Oot ? 'o' : 'm';
+    const auto it = mPlacementsById.find(gameTag + checkId);
+    return it == mPlacementsById.end() ? nullptr : &mPlacements[it->second];
+}
+
+const OotmmPlacement* OotmmGameState::FindCheck(OotmmGame game, uint32_t scene, const std::string& type,
+                                                uint32_t flag) const {
+    const char gameTag = game == OotmmGame::Oot ? 'o' : 'm';
+    const auto it = mPlacementsByLocation.find(gameTag + std::to_string(scene) + ':' + type + ':'
+                                               + std::to_string(flag));
+    return it == mPlacementsByLocation.end() ? nullptr : &mPlacements[it->second];
 }
 
 const std::string& OotmmGameState::GetLastError() const {
@@ -393,6 +414,55 @@ bool OotmmGameState::LoadSeed() {
     };
     if (const auto placements = root.find("placements"); placements != root.end()) {
         addItems(*placements);
+        if (placements->is_array()) {
+            const auto readU32 = [](const json& entry, const char* key) -> std::optional<uint32_t> {
+                const auto it = entry.find(key);
+                if (it == entry.end() || !it->is_number()) {
+                    return std::nullopt;
+                }
+                return it->get<uint32_t>();
+            };
+            for (const auto& entry : *placements) {
+                if (!entry.is_object()) {
+                    continue;
+                }
+                const auto checkGameIt = entry.find("checkGame");
+                std::optional<OotmmGame> checkGame;
+                if (checkGameIt != entry.end()) {
+                    checkGame = ParseGame(*checkGameIt);
+                }
+                OotmmPlacement placement;
+                placement.CheckId = ReadString(entry, "checkId");
+                if (!checkGame.has_value() || placement.CheckId.empty()) {
+                    continue;
+                }
+                placement.CheckGame = *checkGame;
+                placement.CheckName = ReadString(entry, "checkName");
+                placement.CheckScene = readU32(entry, "checkScene");
+                placement.CheckType = ReadString(entry, "checkType");
+                placement.CheckNativeId = readU32(entry, "checkNativeId");
+                placement.CheckFlag = readU32(entry, "checkFlag");
+                placement.ItemGame = ReadString(entry, "itemGame");
+                placement.ItemId = ReadString(entry, "itemId");
+                placement.ItemName = ReadString(entry, "itemName");
+                placement.CloakItemId = ReadString(entry, "cloakItemId");
+                placement.CloakItemName = ReadString(entry, "cloakItemName");
+                placement.OwnerPlayer = readU32(entry, "ownerPlayer").value_or(0);
+                placement.SourcePlayer = readU32(entry, "sourcePlayer").value_or(0);
+                placement.Major = entry.value("major", false);
+
+                const auto index = mPlacements.size();
+                const char gameTag = placement.CheckGame == OotmmGame::Oot ? 'o' : 'm';
+                mPlacementsById.emplace(gameTag + placement.CheckId, index);
+                if (placement.CheckScene.has_value() && placement.CheckFlag.has_value()) {
+                    mPlacementsByLocation.emplace(
+                        gameTag + std::to_string(*placement.CheckScene) + ':' + placement.CheckType
+                            + ':' + std::to_string(*placement.CheckFlag),
+                        index);
+                }
+                mPlacements.push_back(std::move(placement));
+            }
+        }
     }
     if (const auto startingItems = root.find("startingItems"); startingItems != root.end()) {
         addItems(*startingItems);

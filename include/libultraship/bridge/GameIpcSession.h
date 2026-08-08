@@ -9,6 +9,7 @@
 #include <deque>
 #include <optional>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace Ship {
@@ -23,6 +24,7 @@ inline constexpr const char* SettingsDelta = "settingsDelta";
 inline constexpr const char* SettingsApplied = "settingsApplied";
 inline constexpr const char* CheckCollected = "checkCollected";
 inline constexpr const char* CheckAccepted = "checkAccepted";
+inline constexpr const char* CompletedChecks = "completedChecks";
 inline constexpr const char* DeliverItem = "deliverItem";
 inline constexpr const char* ItemApplied = "itemApplied";
 inline constexpr const char* InventorySnapshot = "inventorySnapshot";
@@ -74,6 +76,13 @@ class GameIpcSession {
                                     std::optional<uint32_t> toNativeId, std::optional<uint32_t> ootAge);
     bool ConsumeTransitionAccepted();
 
+    /// Reports a collected check; queued and re-sent until the launcher acknowledges it,
+    /// so a dropped connection cannot lose the collection.
+    bool SendCheckCollected(const std::string& game, const std::string& checkId);
+    /// The launcher's durable record: acknowledged reports plus the connect-time snapshot.
+    bool IsCheckCompleted(const std::string& game, const std::string& checkId) const;
+    uint64_t CompletedChecksRevision() const;
+
     /// True once the launcher is publishing rosters; solo sessions never see one.
     bool PresenceActive() const;
     /// Lossy: an unchanged pose is dropped rather than framed.
@@ -89,6 +98,7 @@ class GameIpcSession {
 
   private:
     void SendHello();
+    bool SendCheckReport(const std::string& key);
     void HandleMessage(const std::string& message, GameIpcSettings& settings, OotmmInventory* inventory,
                        bool& settingsChanged);
 
@@ -112,6 +122,10 @@ class GameIpcSession {
     // sooner on a fast display.
     std::chrono::steady_clock::time_point mPresenceUntil{};
     std::string mLastPoseSent;
+    // Keys are "game:checkId", matching the launcher's check identity.
+    std::unordered_set<std::string> mCompletedChecks;
+    std::vector<std::string> mPendingCheckReports;
+    uint64_t mCompletedRevision = 0;
 };
 
 } // namespace Ship

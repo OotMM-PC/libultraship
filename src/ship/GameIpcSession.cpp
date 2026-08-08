@@ -60,6 +60,9 @@ void GameIpcSession::Stop() {
     mRemoteRosterFresh = false;
     mPresenceUntil = {};
     mLastPoseSent.clear();
+    mCompletedChecks.clear();
+    mPendingCheckReports.clear();
+    mCompletedRevision = 0;
 }
 
 bool GameIpcSession::Pump(GameIpcSettings& settings, OotmmInventory* inventory) {
@@ -109,6 +112,34 @@ bool GameIpcSession::SendPvpHit(const OotmmPvpHit& hit) {
     envelope.append("{\"type\":\"").append(GameIpcMessageType::PvpHit).append("\",\"hit\":");
     envelope.append(body).append("}");
     return Send(std::move(envelope));
+}
+
+bool GameIpcSession::SendCheckCollected(const std::string& game, const std::string& checkId) {
+    const std::string key = game + ":" + checkId;
+    if (mCompletedChecks.count(key) != 0) {
+        return true;
+    }
+    if (std::find(mPendingCheckReports.begin(), mPendingCheckReports.end(), key)
+        == mPendingCheckReports.end()) {
+        mPendingCheckReports.push_back(key);
+    }
+    return SendCheckReport(key);
+}
+
+bool GameIpcSession::IsCheckCompleted(const std::string& game, const std::string& checkId) const {
+    return mCompletedChecks.count(game + ":" + checkId) != 0;
+}
+
+uint64_t GameIpcSession::CompletedChecksRevision() const {
+    return mCompletedRevision;
+}
+
+bool GameIpcSession::SendCheckReport(const std::string& key) {
+    if (!mWelcomed) {
+        return false;
+    }
+    nlohmann::json report{ { "type", GameIpcMessageType::CheckCollected }, { "check", key } };
+    return Send(report.dump());
 }
 
 bool GameIpcSession::TakeRemotePresence(std::vector<OotmmPlayerPose>& poses, std::vector<OotmmPvpHit>& hits) {
@@ -243,6 +274,37 @@ void GameIpcSession::HandleMessage(const std::string& message, GameIpcSettings& 
         }
         mProtocolError.clear();
         mWelcomed = true;
+        for (const auto& key : mPendingCheckReports) {
+            SendCheckReport(key);
+        }
+        return;
+    }
+
+    if (type == GameIpcMessageType::CheckAccepted) {
+        if (!mWelcomed) {
+            return;
+        }
+        const std::string key = root.value("check", "");
+        if (!key.empty() && mCompletedChecks.emplace(key).second) {
+            mCompletedRevision++;
+        }
+        std::erase(mPendingCheckReports, key);
+        return;
+    }
+
+    if (type == GameIpcMessageType::CompletedChecks) {
+        if (!mWelcomed) {
+            return;
+        }
+        const auto checks = root.find("checks");
+        if (checks == root.end() || !checks->is_array()) {
+            return;
+        }
+        for (const auto& value : *checks) {
+            if (value.is_string() && mCompletedChecks.emplace(value.get<std::string>()).second) {
+                mCompletedRevision++;
+            }
+        }
         return;
     }
 
