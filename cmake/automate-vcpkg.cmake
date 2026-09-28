@@ -32,9 +32,6 @@
 #     vcpkg_bootstrap()
 #     vcpkg_install_packages(libsquish physfs)
 # 
-# The call to `vcpkg_bootstrap()` will clone the official Vcpkg repository and bootstrap it. 
-# If it detected an existing environment variable defining a valid `VCPKG_ROOT`, it will 
-# update the existing installation of Vcpkg.
 # 
 # Arguments to `vcpkg_install_packages()` are the packages you want to install using Vcpkg.
 # 
@@ -55,7 +52,11 @@
 # specifying their locations.
 #------------------------------------------------------------------------------------------------------------
 
-cmake_minimum_required (VERSION 3.12)
+cmake_minimum_required (VERSION 3.20)
+include("${CMAKE_CURRENT_LIST_DIR}/PinnedVcpkg.cmake")
+set(VCPKG_REVISION "07f4812200df3d3c931c0c8a6081d3b21fe2bf9f" CACHE STRING "Pinned vcpkg commit SHA")
+set(VCPKG_REPOSITORY "https://github.com/microsoft/vcpkg.git" CACHE STRING "vcpkg Git repository")
+mark_as_advanced(VCPKG_REPOSITORY)
 
 if(WIN32)
     set(VCPKG_FALLBACK_ROOT ${CMAKE_CURRENT_BINARY_DIR}/vcpkg CACHE STRING "vcpkg configuration directory to use if vcpkg was not installed on the system before")
@@ -76,7 +77,7 @@ if (WIN32)
     enable_language(C)
     check_type_size("void*" SIZEOF_VOID_P BUILTIN_TYPES_ONLY)
     
-    if (SIZEOF_VOID_P EQUAL 8 AND NOT DEFINED ${CMAKE_VS_PLATFORM_NAME})
+    if (SIZEOF_VOID_P EQUAL 8 AND NOT DEFINED CMAKE_VS_PLATFORM_NAME)
         message(STATUS "Using Vcpkg triplet 'x64-windows'")
         
         set(VCPKG_TRIPLET x64-windows)
@@ -91,12 +92,11 @@ if(NOT DEFINED VCPKG_ROOT)
     endif()
 endif()
 
-# Installs a new copy of Vcpkg or updates an existing one
 macro(vcpkg_bootstrap)
     _install_or_update_vcpkg()
 
     # Find out whether the user supplied their own VCPKG toolchain file
-    if(NOT DEFINED ${CMAKE_TOOLCHAIN_FILE})
+    if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
         # We know this wasn't set before so we need point the toolchain file to the newly found VCPKG_ROOT
         set(CMAKE_TOOLCHAIN_FILE ${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake CACHE STRING "")
     
@@ -116,22 +116,7 @@ macro(vcpkg_bootstrap)
 endmacro()
 
 macro(_install_or_update_vcpkg)
-    if(NOT EXISTS ${VCPKG_ROOT})
-        message(STATUS "Cloning vcpkg in ${VCPKG_ROOT}")
-        execute_process(COMMAND git clone https://github.com/Microsoft/vcpkg.git ${VCPKG_ROOT} --depth 1)
-
-        # If a reproducible build is desired (and potentially old libraries are # ok), uncomment the
-        # following line and pin the vcpkg repository to a specific githash.
-        # execute_process(COMMAND git checkout 745a0aea597771a580d0b0f4886ea1e3a94dbca6 WORKING_DIRECTORY ${VCPKG_ROOT})
-    else()
-        # The following command has no effect if the vcpkg repository is in a detached head state.
-        message(STATUS "Auto-updating vcpkg in ${VCPKG_ROOT}")
-        execute_process(COMMAND git pull WORKING_DIRECTORY ${VCPKG_ROOT})
-    endif()
-
-    if(NOT EXISTS ${VCPKG_ROOT}/README.md)
-        message(FATAL_ERROR "***** FATAL ERROR: Could not clone vcpkg *****")
-    endif()
+    ship_prepare_vcpkg("${VCPKG_ROOT}" "${VCPKG_REVISION}" "${VCPKG_REPOSITORY}")
 
     if(WIN32)
         set(VCPKG_EXEC ${VCPKG_ROOT}/vcpkg.exe)
@@ -141,15 +126,6 @@ macro(_install_or_update_vcpkg)
         set(VCPKG_BOOTSTRAP ${VCPKG_ROOT}/bootstrap-vcpkg.sh)
     endif()
 
-    if(NOT EXISTS ${VCPKG_EXEC})
-        message("Bootstrapping vcpkg in ${VCPKG_ROOT}")
-        execute_process(COMMAND ${VCPKG_BOOTSTRAP} WORKING_DIRECTORY ${VCPKG_ROOT})
-    endif()
-
-    if(NOT EXISTS ${VCPKG_EXEC})
-        message(FATAL_ERROR "***** FATAL ERROR: Could not bootstrap vcpkg *****")
-    endif()
-   
 endmacro()
 
 # Installs the list of packages given as parameters using Vcpkg
@@ -158,16 +134,13 @@ macro(vcpkg_install_packages)
     # Need the given list to be space-separated
     #string (REPLACE ";" " " PACKAGES_LIST_STR "${ARGN}")
 
-    message(STATUS "Installing/Updating the following vcpkg-packages: ${PACKAGES_LIST_STR}")
+    message(STATUS "Installing pinned vcpkg packages: ${ARGN}")
 
     if (VCPKG_TRIPLET)
         set(ENV{VCPKG_DEFAULT_TRIPLET} "${VCPKG_TRIPLET}")
     endif()
 
-    execute_process(
-        COMMAND ${VCPKG_EXEC} install ${ARGN}
-        WORKING_DIRECTORY ${VCPKG_ROOT}
-        )
+    ship_install_vcpkg_packages("${VCPKG_EXEC}" "${VCPKG_ROOT}" ${ARGN})
 endmacro()
     
 # MIT License

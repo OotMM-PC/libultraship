@@ -29,6 +29,17 @@ cmake --build build
 & 'C:\Program Files\CMake\bin\cmake' --build .\build\x64
 ```
 
+Automatic Windows dependency setup uses the full `VCPKG_REVISION` commit pinned
+in `cmake/automate-vcpkg.cmake`. It does not pull updates into an existing
+checkout. Bootstrap and package installation failures stop configuration.
+
+An existing `VCPKG_ROOT` must match that revision and have no source changes.
+For an older build directory, select a new dependency directory with
+`-DVCPKG_ROOT=C:/path/to/new-vcpkg`. To deliberately use a different audited
+dependency revision, pass `-DVCPKG_REVISION=<full-40-character-SHA>` as well.
+Use a fresh dependency directory when qualifying a revision change: classic
+vcpkg installation can retain packages already installed by an older revision.
+
 ## Sponsors
 Thank you to JetBrains for providing their IDE [CLion](https://www.jetbrains.com/clion/) to me for free!
 
