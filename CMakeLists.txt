@@ -65,3 +65,9 @@ endif()
 
 # =========== Sources =============
 add_subdirectory("src")
+
+option(SHIP_BUILD_TESTS "Build library tests" OFF)
+if(SHIP_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()

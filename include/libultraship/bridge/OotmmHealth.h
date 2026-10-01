@@ -27,4 +27,17 @@ inline std::optional<OotmmHealthResult> ResolveOotmmHealth(
     return OotmmHealthResult{static_cast<int16_t>(nextCapacity), static_cast<uint8_t>(totalPieces % 4),
         static_cast<int16_t>(std::min(healing, nextCapacity - uint64_t(health)))};
 }
+
+inline std::optional<OotmmHealthResult> ResolveOotmmSavedHealth(
+    int16_t capacity, int16_t health, uint8_t pieces, uint64_t containers, uint64_t earnedPieces) {
+    constexpr uint64_t maxPieces = ((uint64_t(std::numeric_limits<int16_t>::max()) / 16) - 3) * 4 + 3;
+    if (capacity < 48 || capacity % 16 != 0 || pieces > 3 ||
+        containers > maxPieces / 4 || earnedPieces > maxPieces || containers * 4 + earnedPieces > maxPieces) {
+        return std::nullopt;
+    }
+    const uint64_t earned = containers * 4 + earnedPieces;
+    const uint64_t saved = uint64_t((capacity - 48) / 16) * 4 + pieces;
+    return ResolveOotmmHealth(capacity, health, pieces, 0,
+        earned > saved ? static_cast<uint32_t>(earned - saved) : 0, 0);
+}
 }

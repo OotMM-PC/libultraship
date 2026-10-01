@@ -1,0 +1,28 @@
+cmake_minimum_required(VERSION 3.20)
+if(TARGET libultraship)
+    add_executable(OotmmSavePairTests OotmmSavePairTests.cpp)
+    target_compile_features(OotmmSavePairTests PRIVATE cxx_std_20)
+    target_link_libraries(OotmmSavePairTests PRIVATE libultraship)
+    add_test(NAME OotmmSavePairTests COMMAND OotmmSavePairTests "${CMAKE_CURRENT_BINARY_DIR}/pair-evidence/$<CONFIG>")
+    return()
+endif()
+project(OotmmLibultrashipTests LANGUAGES CXX)
+
+find_package(nlohmann_json CONFIG REQUIRED)
+enable_testing()
+
+add_executable(AtomicFileTests AtomicFileTests.cpp ../src/ship/utils/AtomicFile.cpp)
+target_compile_features(AtomicFileTests PRIVATE cxx_std_20)
+target_include_directories(AtomicFileTests PRIVATE ../include)
+add_test(NAME AtomicFileTests COMMAND AtomicFileTests "${CMAKE_CURRENT_BINARY_DIR}/atomic-evidence")
+
+add_executable(OotmmSavePairTests OotmmSavePairTests.cpp ../src/ship/utils/AtomicFile.cpp)
+target_compile_features(OotmmSavePairTests PRIVATE cxx_std_20)
+target_include_directories(OotmmSavePairTests PRIVATE ../include)
+target_link_libraries(OotmmSavePairTests PRIVATE nlohmann_json::nlohmann_json)
+add_test(NAME OotmmSavePairTests COMMAND OotmmSavePairTests "${CMAKE_CURRENT_BINARY_DIR}/pair-evidence/$<CONFIG>")
+
+add_executable(OotmmSaveRecoveryTests OotmmSaveRecoveryTests.cpp ../src/ship/utils/AtomicFile.cpp)
+target_compile_features(OotmmSaveRecoveryTests PRIVATE cxx_std_20)
+target_include_directories(OotmmSaveRecoveryTests PRIVATE ../include)
+add_test(NAME OotmmSaveRecoveryTests COMMAND OotmmSaveRecoveryTests "${CMAKE_CURRENT_BINARY_DIR}/recovery-evidence/$<CONFIG>")

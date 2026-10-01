@@ -13,15 +13,34 @@ namespace {
 
 using json = nlohmann::json;
 
-bool ReadJsonFile(const std::string& path, json& result, std::string& error) {
+bool ReadJsonFile(const std::string& path, json& result, std::string& error, bool uniqueKeys = false) {
     std::ifstream stream(path);
     if (!stream) {
         error = "cannot open " + path;
         return false;
     }
 
-    result = json::parse(stream, nullptr, false);
-    if (result.is_discarded() || !result.is_object()) {
+    bool valid = true;
+    std::vector<std::set<std::string>> keys;
+    result = json::parse(stream, [&](int depth, json::parse_event_t event, json& value) {
+        if (!uniqueKeys) {
+            return true;
+        }
+        if (depth > 16) {
+            valid = false;
+        }
+        if (event == json::parse_event_t::object_start) {
+            keys.emplace_back();
+        } else if (event == json::parse_event_t::key) {
+            if (keys.empty() || !keys.back().insert(value.get<std::string>()).second) {
+                valid = false;
+            }
+        } else if (event == json::parse_event_t::object_end && !keys.empty()) {
+            keys.pop_back();
+        }
+        return true;
+    }, false);
+    if (!valid || result.is_discarded() || !result.is_object()) {
         error = path + " is not a JSON object";
         return false;
     }
@@ -35,7 +54,7 @@ std::string ReadString(const json& root, const char* key) {
 
 std::optional<uint32_t> ReadU32(const json& root, const char* key) {
     const auto it = root.find(key);
-    if (it == root.end() || !it->is_number_unsigned()) {
+    if (it == root.end() || !it->is_number_unsigned() || it->get<uint64_t>() > UINT32_MAX) {
         return std::nullopt;
     }
     return it->get<uint32_t>();
@@ -90,7 +109,7 @@ bool OotmmGameState::LoadFromFile(const std::string& path) {
     Reset();
 
     json root;
-    if (!ReadJsonFile(path, root, mLastError)) {
+    if (!ReadJsonFile(path, root, mLastError, true)) {
         return false;
     }
 
@@ -107,6 +126,13 @@ bool OotmmGameState::LoadFromFile(const std::string& path) {
     const auto allowDebug = root.find("allowDebugMenus");
     if (allowDebug != root.end() && allowDebug->is_boolean()) {
         mBoot.AllowDebugMenus = allowDebug->get<bool>();
+    }
+    if (const auto fileSelect = root.find("openFileSelect"); fileSelect != root.end()) {
+        if (!fileSelect->is_boolean()) {
+            mLastError = "boot config openFileSelect must be boolean";
+            return false;
+        }
+        mBoot.OpenFileSelect = fileSelect->get<bool>();
     }
     const auto protocol = root.find("multiworldProtocol");
     if (protocol != root.end() && protocol->is_number_integer()) {
@@ -125,12 +151,30 @@ bool OotmmGameState::LoadFromFile(const std::string& path) {
     mBoot.BootEntrance = ReadU32(root, "bootEntrance");
     mBoot.OotAge = ReadU32(root, "ootAge");
     mBoot.LogicalSlot = ReadU32(root, "logicalSlot");
-    if (mBoot.LogicalSlot.has_value() && *mBoot.LogicalSlot > 2) {
+    if (root.contains("logicalSlot") && (!mBoot.LogicalSlot.has_value() || *mBoot.LogicalSlot > 2)) {
         mLastError = "boot config logicalSlot must be between 0 and 2";
         return false;
     }
 
+    if (const auto recovery = root.find("mmRecovery"); recovery != root.end()) {
+        if (mBoot.BootGame != OotmmGame::Mm || !mBoot.LogicalSlot.has_value() || mBoot.SaveId.size() != 32 ||
+            !std::all_of(mBoot.SaveId.begin(), mBoot.SaveId.end(), [](char c) {
+                return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+            }) || !(mBoot.MmRecovery = OotmmRecoveryRequest::Parse(recovery->dump())).has_value()) {
+            mLastError = "boot config has invalid MM recovery request";
+            return false;
+        }
+    }
+
     const auto parentWindow = root.find("parentWindow");
+    if (const auto shared = root.find("sharedResources"); shared != root.end()) {
+        if (!mBoot.LogicalSlot.has_value() ||
+            !(mBoot.SharedResources = OotmmSharedResources::Parse(shared->dump(), mBoot.SaveId,
+                                                                 *mBoot.LogicalSlot)).has_value()) {
+            mLastError = "boot config has invalid shared resources";
+            return false;
+        }
+    }
     if (parentWindow != root.end()) {
         if (parentWindow->is_number_unsigned()) {
             mBoot.ParentWindow = parentWindow->get<uint64_t>();

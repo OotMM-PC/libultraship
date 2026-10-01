@@ -1,6 +1,8 @@
 #pragma once
 
 #include "libultraship/bridge/OotmmInventory.h"
+#include "libultraship/bridge/OotmmSharedResources.h"
+#include "libultraship/bridge/OotmmRecoveryRequest.h"
 
 #include <cstdint>
 #include <optional>
@@ -118,11 +120,14 @@ struct OotmmBootConfig {
     std::string MmSaveDir;
     std::string NativeSaveSubdir;
     bool AllowDebugMenus = false;
+    bool OpenFileSelect = false;
     int MultiworldProtocol = 3;
     OotmmGame BootGame = OotmmGame::Oot;
     std::optional<uint32_t> BootEntrance;
     std::optional<uint32_t> OotAge;
     std::optional<uint32_t> LogicalSlot;
+    std::optional<OotmmSharedResources> SharedResources;
+    std::optional<OotmmRecoveryRequest> MmRecovery;
     std::optional<uint64_t> ParentWindow;
 };
 
