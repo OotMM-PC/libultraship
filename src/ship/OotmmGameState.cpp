@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <cstdlib>
 #include <fstream>
+#include <limits>
 #include <nlohmann/json.hpp>
+#include <type_traits>
 
 namespace Ship {
 
@@ -159,15 +161,26 @@ void OotmmGameState::Reset() {
     mBoolSettings.clear();
     mStringSettings.clear();
     mNumberSettings.clear();
+    mSpecialConds.clear();
     mWorldFlags.clear();
     mAllWorldFlags.clear();
     mPreCompletedDungeons.clear();
     mCustomItems.Reset();
     mSeedItems.clear();
     mEntrances.clear();
+    mEntrancesSpawn.clear();
+    mEntrancesOwl.clear();
+    mEntrancesSong.clear();
+    mPrices.clear();
+    mBossIds.clear();
+    mDungeonWarps.clear();
+    mSongEventsOot.clear();
+    mSongEventsMm.clear();
+    mHints = {};
     mPlacements.clear();
     mPlacementsById.clear();
     mPlacementsByLocation.clear();
+    mPlacementsByNativeId.clear();
     mLastError.clear();
     mActive = false;
     mHasSeed = false;
@@ -241,6 +254,21 @@ int OotmmGameState::GetIntSetting(const std::string& name, int fallback) const {
     return it == mNumberSettings.end() ? fallback : static_cast<int>(it->second);
 }
 
+bool OotmmGameState::IsSpecialCondMet(const std::string& name, const OotmmInventory& inventory) const {
+    const auto it = mSpecialConds.find(name);
+    if (it == mSpecialConds.end()) {
+        return false;
+    }
+    uint64_t total = 0;
+    for (const auto& item : it->second.Items) {
+        total += inventory.Count(item);
+    }
+    for (const auto& item : it->second.ItemsUnique) {
+        total += inventory.Has(item) ? 1 : 0;
+    }
+    return total >= it->second.Count;
+}
+
 bool OotmmGameState::HasWorldFlag(const std::string& name) const {
     return mAllWorldFlags.contains(name) || mWorldFlags.contains(name);
 }
@@ -276,6 +304,139 @@ const OotmmEntranceMapping* OotmmGameState::FindEntrance(OotmmGame game, uint32_
     return mapping == mEntrances.end() ? nullptr : &*mapping;
 }
 
+std::optional<uint32_t> OotmmGameState::GetOwlEntrance(uint32_t owl) const {
+    return owl < mEntrancesOwl.size() ? std::optional<uint32_t>(mEntrancesOwl[owl]) : std::nullopt;
+}
+
+std::optional<uint16_t> OotmmGameState::GetPrice(uint32_t index) const {
+    return index < mPrices.size() ? std::optional<uint16_t>(mPrices[index]) : std::nullopt;
+}
+
+std::optional<uint32_t> OotmmGameState::GetSongEntrance(uint32_t song) const {
+    return song < mEntrancesSong.size() ? std::optional<uint32_t>(mEntrancesSong[song]) : std::nullopt;
+}
+
+std::optional<uint32_t> OotmmGameState::GetSpawnEntrance(uint32_t ootAge) const {
+    if (ootAge >= 2 || mEntrancesSpawn.size() != 2) {
+        return std::nullopt;
+    }
+    return mEntrancesSpawn[ootAge];
+}
+
+std::optional<uint32_t> OotmmGameState::GetBossDungeon(uint32_t bossId) const {
+    constexpr uint32_t kBossCount = 12;
+    if (bossId >= kBossCount || (!mBossIds.empty() && mBossIds.size() != kBossCount)) {
+        return std::nullopt;
+    }
+    return mBossIds.empty() ? bossId : mBossIds[bossId];
+}
+
+std::optional<uint32_t> OotmmGameState::ResolveBossWarp(uint32_t bossId, bool woodfallTempleRaised) const {
+    constexpr uint32_t kBossCount = 12;
+    constexpr uint32_t kForeignEntrance = 0x80000000;
+    if (bossId >= kBossCount || mDungeonWarps.size() != kBossCount) {
+        return std::nullopt;
+    }
+
+    if (!mBossIds.empty() && mBossIds.size() != kBossCount) {
+        return std::nullopt;
+    }
+    const uint32_t dungeonId = mBossIds.empty() ? bossId : mBossIds[bossId];
+    if (dungeonId >= mDungeonWarps.size()) {
+        return std::nullopt;
+    }
+
+    switch (const uint32_t destination = mDungeonWarps[dungeonId]) {
+        case 0x0209:
+            return 0x0457;
+        case 0x0215:
+            return 0x0600;
+        case 0x024A:
+            return 0x04F6;
+        case 0x021D:
+            return 0x0604;
+        case 0x0205:
+            return 0x0568;
+        case kForeignEntrance | 0x8610:
+            return kForeignEntrance | (woodfallTempleRaised ? 0x3010 : 0x8600);
+        case kForeignEntrance | 0xB210:
+            return kForeignEntrance | 0x9A70;
+        case kForeignEntrance | 0xAA20:
+        case kForeignEntrance | 0xAC10:
+            return kForeignEntrance | 0x2070;
+        default:
+            return destination;
+    }
+}
+
+const std::vector<uint8_t>& OotmmGameState::GetSongEventsOot() const {
+    return mSongEventsOot;
+}
+
+const std::vector<uint8_t>& OotmmGameState::GetSongEventsMm() const {
+    return mSongEventsMm;
+}
+
+std::string OotmmHintLayout(std::string text) {
+    constexpr int kMaxLineLength = 37;
+    int lastSpace = -1;
+    int lineLength = 0;
+    int lineCount = 0;
+    for (int i = 0; i < static_cast<int>(text.size()); ++i) {
+        const char c = text[i];
+        if (c == '%' && i + 1 < static_cast<int>(text.size())) {
+            ++i;
+            continue;
+        }
+        if (c >= ' ' && c <= '~') {
+            ++lineLength;
+            if (lineLength >= kMaxLineLength && lastSpace != -1) {
+                lineLength = i - lastSpace;
+                if (lineCount < 3) {
+                    text[lastSpace] = '\n';
+                    ++lineCount;
+                } else {
+                    text[lastSpace] = '\f';
+                    lineCount = 0;
+                }
+                lastSpace = -1;
+            }
+        }
+        if (c == ' ') {
+            lastSpace = i;
+        } else if (c == '\n') {
+            lastSpace = i;
+            lineLength = 999;
+        } else if (c == '\f') {
+            lastSpace = -1;
+            lineLength = 0;
+            lineCount = 0;
+        }
+    }
+    return text;
+}
+
+const std::string& OotmmHints::StaticReward(OotmmStaticReward reward) const {
+    static const std::string kNone;
+    const auto index = static_cast<size_t>(reward);
+    return index < StaticRewards.size() ? StaticRewards[index] : kNone;
+}
+
+const OotmmHints& OotmmGameState::GetHints() const {
+    return mHints;
+}
+
+std::string OotmmGameState::GetGossipHint(OotmmGame game, uint32_t key) const {
+    const auto& stones = game == OotmmGame::Oot ? mHints.GossipOot : mHints.GossipMm;
+    if (const auto it = stones.find(key); it != stones.end() && !it->second.empty()) {
+        return it->second;
+    }
+    if (mHints.Junk.empty()) {
+        return {};
+    }
+    return mHints.Junk[key % mHints.Junk.size()];
+}
+
 const std::vector<OotmmPlacement>& OotmmGameState::GetPlacements() const {
     return mPlacements;
 }
@@ -292,6 +453,13 @@ const OotmmPlacement* OotmmGameState::FindCheck(OotmmGame game, uint32_t scene, 
     const auto it = mPlacementsByLocation.find(gameTag + std::to_string(scene) + ':' + type + ':'
                                                + std::to_string(flag));
     return it == mPlacementsByLocation.end() ? nullptr : &mPlacements[it->second];
+}
+
+const OotmmPlacement* OotmmGameState::FindCheck(OotmmGame game, const std::string& type,
+                                                const std::string& nativeId) const {
+    const char gameTag = game == OotmmGame::Oot ? 'o' : 'm';
+    const auto it = mPlacementsByNativeId.find(gameTag + type + ':' + nativeId);
+    return it == mPlacementsByNativeId.end() ? nullptr : &mPlacements[it->second];
 }
 
 const std::string& OotmmGameState::GetLastError() const {
@@ -370,6 +538,36 @@ bool OotmmGameState::LoadSeed() {
         }
     }
 
+    const auto logic = root.find("logic");
+    if (logic != root.end() && logic->is_object()) {
+        const auto specials = logic->find("specials");
+        if (specials != logic->end() && specials->is_object()) {
+            for (auto it = specials->begin(); it != specials->end(); ++it) {
+                if (!it->is_object()) {
+                    continue;
+                }
+                OotmmSpecialCond cond;
+                const auto readItems = [&](const char* key, std::vector<std::string>& out) {
+                    const auto items = it->find(key);
+                    if (items != it->end() && items->is_array()) {
+                        for (const auto& item : *items) {
+                            if (item.is_string()) {
+                                out.push_back(item.get<std::string>());
+                            }
+                        }
+                    }
+                };
+                readItems("items", cond.Items);
+                readItems("itemsUnique", cond.ItemsUnique);
+                const auto count = it->find("count");
+                if (count != it->end() && count->is_number_unsigned()) {
+                    cond.Count = count->get<uint32_t>();
+                }
+                mSpecialConds.emplace(it.key(), std::move(cond));
+            }
+        }
+    }
+
     const auto worldFlags = root.find("worldFlags");
     if (worldFlags != root.end() && worldFlags->is_object()) {
         for (auto it = worldFlags->begin(); it != worldFlags->end(); ++it) {
@@ -440,7 +638,13 @@ bool OotmmGameState::LoadSeed() {
                 placement.CheckName = ReadString(entry, "checkName");
                 placement.CheckScene = readU32(entry, "checkScene");
                 placement.CheckType = ReadString(entry, "checkType");
-                placement.CheckNativeId = readU32(entry, "checkNativeId");
+                if (const auto nativeIt = entry.find("checkNativeId"); nativeIt != entry.end()) {
+                    if (nativeIt->is_string()) {
+                        placement.CheckNativeId = nativeIt->get<std::string>();
+                    } else if (nativeIt->is_number_unsigned()) {
+                        placement.CheckNativeId = std::to_string(nativeIt->get<uint64_t>());
+                    }
+                }
                 placement.CheckFlag = readU32(entry, "checkFlag");
                 placement.ItemGame = ReadString(entry, "itemGame");
                 placement.ItemId = ReadString(entry, "itemId");
@@ -460,12 +664,126 @@ bool OotmmGameState::LoadSeed() {
                             + ':' + std::to_string(*placement.CheckFlag),
                         index);
                 }
+                if (!placement.CheckNativeId.empty()) {
+                    mPlacementsByNativeId.emplace(gameTag + placement.CheckType + ':' + placement.CheckNativeId,
+                                                  index);
+                }
                 mPlacements.push_back(std::move(placement));
             }
         }
     }
     if (const auto startingItems = root.find("startingItems"); startingItems != root.end()) {
         addItems(*startingItems);
+    }
+
+    const auto readU32Array = [this, &root](const char* key, auto& out, size_t count, uint64_t maximum) {
+        const auto values = root.find(key);
+        if (values == root.end()) {
+            return true;
+        }
+        if (!values->is_array() || values->size() != count) {
+            mLastError = std::string(key) + " must contain exactly " + std::to_string(count) + " entries";
+            return false;
+        }
+        for (const auto& value : *values) {
+            using Value = typename std::decay_t<decltype(out)>::value_type;
+            if (!value.is_number_unsigned() || value.get<uint64_t>() > maximum) {
+                mLastError = std::string(key) + " contains an invalid entry at index " + std::to_string(out.size());
+                return false;
+            }
+            out.push_back(static_cast<Value>(value.get<uint32_t>()));
+        }
+        return true;
+    };
+    if (!readU32Array("prices", mPrices, 141, std::numeric_limits<uint16_t>::max()) ||
+        !readU32Array("entrancesOwl", mEntrancesOwl, 10, std::numeric_limits<uint32_t>::max()) ||
+        !readU32Array("entrancesSong", mEntrancesSong, 6, std::numeric_limits<uint32_t>::max()) ||
+        !readU32Array("bossIds", mBossIds, 12, 11) ||
+        !readU32Array("entrancesSpawn", mEntrancesSpawn, 2, std::numeric_limits<uint32_t>::max()) ||
+        !readU32Array("dungeonWarps", mDungeonWarps, 12, std::numeric_limits<uint32_t>::max())) {
+        return false;
+    }
+    if (std::unordered_set<uint8_t>(mBossIds.begin(), mBossIds.end()).size() != mBossIds.size()) {
+        mLastError = "bossIds must assign each dungeon exactly once";
+        return false;
+    }
+
+    const auto readSongEvents = [&root](const char* key, std::vector<uint8_t>& out) {
+        const auto events = root.find(key);
+        if (events == root.end() || !events->is_array()) {
+            return;
+        }
+        for (const auto& value : *events) {
+            if (value.is_number_unsigned()) {
+                out.push_back(static_cast<uint8_t>(value.get<uint32_t>()));
+            }
+        }
+    };
+    readSongEvents("songEventsOot", mSongEventsOot);
+    readSongEvents("songEventsMm", mSongEventsMm);
+
+    if (const auto hints = root.find("hints"); hints != root.end() && hints->is_object()) {
+        const auto readRegion = [](const json& value) {
+            OotmmHintRegion region;
+            if (value.is_object()) {
+                region.RegionId = value.value("regionId", 0u);
+                region.Text = ReadString(value, "text");
+            }
+            return region;
+        };
+        const auto readRegions = [&](const char* key) {
+            std::vector<OotmmHintRegion> regions;
+            if (const auto values = hints->find(key); values != hints->end() && values->is_array()) {
+                for (const auto& value : *values) {
+                    regions.push_back(readRegion(value));
+                }
+            }
+            return regions;
+        };
+        const auto readStrings = [&](const char* key) {
+            std::vector<std::string> strings;
+            if (const auto values = hints->find(key); values != hints->end() && values->is_array()) {
+                for (const auto& value : *values) {
+                    strings.push_back(value.is_string() ? value.get<std::string>() : std::string());
+                }
+            }
+            return strings;
+        };
+        if (const auto gossip = hints->find("gossip"); gossip != hints->end() && gossip->is_array()) {
+            for (const auto& entry : *gossip) {
+                if (!entry.is_object() || !entry.contains("stoneKey") || !entry["stoneKey"].is_number_unsigned()) {
+                    continue;
+                }
+                const auto game = ParseGame(entry.value("stoneGame", json()));
+                if (!game.has_value()) {
+                    continue;
+                }
+                auto& stones = *game == OotmmGame::Oot ? mHints.GossipOot : mHints.GossipMm;
+                stones[entry["stoneKey"].get<uint32_t>()] = ReadString(entry, "text");
+            }
+        }
+        mHints.Junk = readStrings("junk");
+        mHints.DungeonRewards = readRegions("dungeonRewards");
+        mHints.OathToOrder = readRegions("oathToOrder");
+        mHints.StaticRewards = readStrings("staticRewards");
+        if (const auto altar = readStrings("altarRewards"); mHints.StaticRewards.empty() && altar.size() >= 2) {
+            mHints.StaticRewards.resize(static_cast<size_t>(OotmmStaticReward::SongOfTime) + 1);
+            mHints.StaticRewards[static_cast<size_t>(OotmmStaticReward::OcarinaOfTime)] = altar[0];
+            mHints.StaticRewards[static_cast<size_t>(OotmmStaticReward::SongOfTime)] = altar[1];
+        }
+        if (const auto value = hints->find("lightArrow"); value != hints->end()) {
+            mHints.LightArrow = readRegion(*value);
+        }
+        if (const auto value = hints->find("ganonBossKey"); value != hints->end()) {
+            mHints.GanonBossKey = readRegion(*value);
+        }
+        if (const auto conds = hints->find("specialConds"); conds != hints->end() && conds->is_object()) {
+            for (auto it = conds->begin(); it != conds->end(); ++it) {
+                if (it->is_string()) {
+                    mHints.SpecialConds[it.key()] = it->get<std::string>();
+                }
+            }
+        }
     }
 
     const auto entrances = root.find("entrances");

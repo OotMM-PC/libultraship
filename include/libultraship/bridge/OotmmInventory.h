@@ -77,6 +77,7 @@ class OotmmItemCatalog {
     static std::string TrimDestinationSuffix(std::string name, const std::string& destinationGame);
     static std::string TrimGameSuffix(std::string name);
     static bool IsTrap(std::string_view itemId);
+    static bool IsNothing(std::string_view itemId);
 
   private:
     std::vector<OotmmItemDefinition> mItems;

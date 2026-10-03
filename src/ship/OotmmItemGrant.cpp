@@ -124,7 +124,7 @@ bool OotmmItemGrant::IsInventoryBacked(OotmmGrantKind kind) {
 
 std::vector<OotmmGrantOp> OotmmItemGrant::Resolve(std::string_view itemId, uint32_t count) {
     std::vector<OotmmGrantOp> ops;
-    if (count == 0) {
+    if (count == 0 || itemId == "NOTHING") {
         return ops;
     }
 

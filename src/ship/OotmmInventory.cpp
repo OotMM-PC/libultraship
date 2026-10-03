@@ -338,6 +338,10 @@ bool OotmmItemCatalog::IsTrap(std::string_view itemId) {
     return itemId.find("_TRAP_") != std::string_view::npos;
 }
 
+bool OotmmItemCatalog::IsNothing(std::string_view itemId) {
+    return itemId == "NOTHING";
+}
+
 void OotmmInventory::Reset() {
     mRevision = 0;
     mValues.clear();
