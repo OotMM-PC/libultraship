@@ -61,6 +61,7 @@ struct GameIpcItemPresentation {
     uint32_t RecipientPlayer = 0;
     uint32_t ViewerPlayer = 0;
     bool Debug = false;
+    std::string CheckKey;
 };
 
 class GameIpcSession {
@@ -78,7 +79,9 @@ class GameIpcSession {
 
     /// Reports a collected check; queued and re-sent until the launcher acknowledges it,
     /// so a dropped connection cannot lose the collection.
-    bool SendCheckCollected(const std::string& game, const std::string& checkId);
+    bool SendCheckCollected(const std::string& game, const std::string& checkId, bool present = false);
+    bool IsCheckPresentationPending(const std::string& key) const;
+    void CompleteCheckPresentation(const std::string& key);
     /// The launcher's durable record: acknowledged reports plus the connect-time snapshot.
     bool IsCheckCompleted(const std::string& game, const std::string& checkId) const;
     uint64_t CompletedChecksRevision() const;
@@ -109,8 +112,11 @@ class GameIpcSession {
     std::string mProtocolError;
     std::deque<std::string> mUnhandled;
     std::deque<GameIpcItemPresentation> mPresentations;
+    std::unordered_set<std::string> mPendingCheckPresentations;
+    std::unordered_set<std::string> mReceivedCheckPresentations;
     bool mWasConnected = false;
     bool mWelcomed = false;
+    bool mCheckRewardSupported = false;
     bool mTransitionAccepted = false;
 
     // Held unparsed until the logic tick consumes it; discarding an unread roster is safe

@@ -22,6 +22,18 @@ target_include_directories(OotmmSavePairTests PRIVATE ../include)
 target_link_libraries(OotmmSavePairTests PRIVATE nlohmann_json::nlohmann_json)
 add_test(NAME OotmmSavePairTests COMMAND OotmmSavePairTests "${CMAKE_CURRENT_BINARY_DIR}/pair-evidence/$<CONFIG>")
 
+if(WIN32)
+    add_executable(GameIpcSessionTests GameIpcSessionTests.cpp
+        ../src/ship/GameIpcSession.cpp ../src/ship/IpcClient.cpp
+        ../src/ship/OotmmInventory.cpp ../src/ship/OotmmPresence.cpp ../src/ship/OotmmItemGrant.cpp)
+    target_compile_features(GameIpcSessionTests PRIVATE cxx_std_20)
+    target_compile_definitions(GameIpcSessionTests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+    target_include_directories(GameIpcSessionTests PRIVATE ../include)
+    target_link_libraries(GameIpcSessionTests PRIVATE nlohmann_json::nlohmann_json)
+    add_test(NAME GameIpcSessionTests COMMAND GameIpcSessionTests
+        "${CMAKE_CURRENT_BINARY_DIR}/ipc-evidence/$<CONFIG>")
+endif()
+
 add_executable(OotmmSaveRecoveryTests OotmmSaveRecoveryTests.cpp ../src/ship/utils/AtomicFile.cpp)
 target_compile_features(OotmmSaveRecoveryTests PRIVATE cxx_std_20)
 target_include_directories(OotmmSaveRecoveryTests PRIVATE ../include)

@@ -69,11 +69,11 @@ void GameOverlay::TextDraw(float x, float y, bool shadow, ImVec4 color, const ch
     if (shadow) {
         ImGui::SetCursorPos(ImVec2(x + 1, y + 1));
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(.0f, .0f, .0f, color.w));
-        ImGui::Text(buf, args);
+        ImGui::TextUnformatted(buf);
+        ImGui::PopStyleColor();
     }
-    ImGui::PopStyleColor();
     ImGui::SetCursorPos(ImVec2(x, y));
-    ImGui::Text(buf, args);
+    ImGui::TextUnformatted(buf);
     ImGui::PopFont();
     ImGui::PopStyleColor();
 }
@@ -88,6 +88,15 @@ void GameOverlay::TextDrawNotification(float duration, bool shadow, const char* 
     mRegisteredOverlays[StringHelper::Sprintf("NotificationID:%d%d", rand(), mRegisteredOverlays.size())] =
         Overlay({ OverlayType::NOTIFICATION, buf, duration, duration });
     mNeedsCleanup = true;
+}
+
+void GameOverlay::TextDrawStatus(const std::string& id, const std::string& text) {
+    const std::string key = "Status:" + id;
+    if (text.empty()) {
+        mRegisteredOverlays.erase(key);
+    } else {
+        mRegisteredOverlays[key] = Overlay({ OverlayType::STATUS, text, 1.0f, 1.0f });
+    }
 }
 
 void GameOverlay::ClearNotifications() {
@@ -232,9 +241,10 @@ void GameOverlay::Draw() {
             textY += 30;
         }
 
-        if (overlay.Type == OverlayType::NOTIFICATION && overlay.duration > 0) {
+        if (overlay.Type == OverlayType::STATUS ||
+            (overlay.Type == OverlayType::NOTIFICATION && overlay.duration > 0)) {
             const char* text = overlay.Value.c_str();
-            const float duration = overlay.duration / overlay.fadeTime;
+            const float duration = overlay.Type == OverlayType::STATUS ? 1.0f : overlay.duration / overlay.fadeTime;
 
             const ImVec4 color = ImVec4(1.0f, 1.0f, 1.0f, duration);
 #ifdef __ANDROID__
@@ -246,9 +256,13 @@ void GameOverlay::Draw() {
 #endif
 
             TextDraw(GetScreenWidth() - textWidth - textOffset, GetScreenHeight() - textOffset - notY, true, color,
-                     text);
-            notY += 30;
-            overlay.duration -= .05f;
+                     "%s", text);
+            if (overlay.Type == OverlayType::STATUS) {
+                notY += CalculateTextSize(text).y + 10.0f;
+            } else {
+                notY += 30;
+                overlay.duration -= .05f;
+            }
         }
     }
 

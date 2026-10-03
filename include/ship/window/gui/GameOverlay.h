@@ -10,7 +10,7 @@
 
 namespace Ship {
 
-enum class OverlayType { TEXT, IMAGE, NOTIFICATION };
+enum class OverlayType { TEXT, IMAGE, NOTIFICATION, STATUS };
 
 struct Overlay {
     OverlayType Type;
@@ -35,6 +35,7 @@ class GameOverlay {
                              float wrapWidth = -1.0f);
     void TextDraw(float x, float y, bool shadow, ImVec4 color, const char* text, ...);
     void TextDrawNotification(float duration, bool shadow, const char* fmt, ...);
+    void TextDrawStatus(const std::string& id, const std::string& text);
     void ClearNotifications();
     ImGuiID GetID();
 

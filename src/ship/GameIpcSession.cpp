@@ -52,8 +52,11 @@ void GameIpcSession::Stop() {
     mProtocolError.clear();
     mUnhandled.clear();
     mPresentations.clear();
+    mPendingCheckPresentations.clear();
+    mReceivedCheckPresentations.clear();
     mWasConnected = false;
     mWelcomed = false;
+    mCheckRewardSupported = false;
     mTransitionAccepted = false;
     mRemoteRoster.clear();
     mRemoteHits.clear();
@@ -114,9 +117,12 @@ bool GameIpcSession::SendPvpHit(const OotmmPvpHit& hit) {
     return Send(std::move(envelope));
 }
 
-bool GameIpcSession::SendCheckCollected(const std::string& game, const std::string& checkId) {
+bool GameIpcSession::SendCheckCollected(const std::string& game, const std::string& checkId, bool present) {
     const std::string key = game + ":" + checkId;
-    if (mCompletedChecks.count(key) != 0) {
+    if (present && mReceivedCheckPresentations.count(key) == 0) {
+        mPendingCheckPresentations.emplace(key);
+    }
+    if (mCompletedChecks.count(key) != 0 && mPendingCheckPresentations.count(key) == 0) {
         return true;
     }
     if (std::find(mPendingCheckReports.begin(), mPendingCheckReports.end(), key)
@@ -124,6 +130,14 @@ bool GameIpcSession::SendCheckCollected(const std::string& game, const std::stri
         mPendingCheckReports.push_back(key);
     }
     return SendCheckReport(key);
+}
+
+bool GameIpcSession::IsCheckPresentationPending(const std::string& key) const {
+    return mPendingCheckPresentations.count(key) != 0;
+}
+
+void GameIpcSession::CompleteCheckPresentation(const std::string& key) {
+    mPendingCheckPresentations.erase(key);
 }
 
 bool GameIpcSession::IsCheckCompleted(const std::string& game, const std::string& checkId) const {
@@ -139,6 +153,13 @@ bool GameIpcSession::SendCheckReport(const std::string& key) {
         return false;
     }
     nlohmann::json report{ { "type", GameIpcMessageType::CheckCollected }, { "check", key } };
+    if (mPendingCheckPresentations.count(key) != 0) {
+        if (!mCheckRewardSupported) {
+            mProtocolError = "Launcher does not support correlated check rewards; update the launcher";
+            return false;
+        }
+        report["present"] = true;
+    }
     return Send(report.dump());
 }
 
@@ -273,9 +294,16 @@ void GameIpcSession::HandleMessage(const std::string& message, GameIpcSettings& 
             return;
         }
         mProtocolError.clear();
+        mCheckRewardSupported = root.value("checkRewardProtocol", 0) == 1;
         mWelcomed = true;
         for (const auto& key : mPendingCheckReports) {
             SendCheckReport(key);
+        }
+        for (const auto& key : mPendingCheckPresentations) {
+            if (mReceivedCheckPresentations.count(key) == 0 &&
+                std::find(mPendingCheckReports.begin(), mPendingCheckReports.end(), key) == mPendingCheckReports.end()) {
+                SendCheckReport(key);
+            }
         }
         return;
     }
@@ -376,7 +404,20 @@ void GameIpcSession::HandleMessage(const std::string& message, GameIpcSettings& 
             mProtocolError = "Launcher sent an invalid item presentation";
             return;
         }
-        mPresentations.push_back({
+        const auto check = root.find("check");
+        if (check != root.end() && !check->is_string() && !check->is_null()) {
+            mProtocolError = "Launcher sent an invalid check presentation identity";
+            return;
+        }
+        const std::string checkKey = check != root.end() && check->is_string()
+            ? check->get<std::string>() : "";
+        if (!checkKey.empty()) {
+            if (mPendingCheckPresentations.count(checkKey) == 0 ||
+                mReceivedCheckPresentations.count(checkKey) != 0) {
+                return;
+            }
+        }
+        GameIpcItemPresentation presentation{
             .ItemId = itemId,
             .ItemName = itemName,
             .ItemGame = itemGame,
@@ -385,7 +426,12 @@ void GameIpcSession::HandleMessage(const std::string& message, GameIpcSettings& 
             .RecipientPlayer = root.value("recipientPlayer", uint32_t{ 0 }),
             .ViewerPlayer = root.value("viewerPlayer", uint32_t{ 0 }),
             .Debug = root.value("debug", false),
-        });
+            .CheckKey = checkKey,
+        };
+        mPresentations.push_back(std::move(presentation));
+        if (!checkKey.empty()) {
+            mReceivedCheckPresentations.emplace(checkKey);
+        }
         return;
     }
 

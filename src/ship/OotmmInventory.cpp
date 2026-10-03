@@ -116,6 +116,33 @@ std::string DisplayName(std::string id, std::string name) {
     return name.empty() ? std::move(id) : std::move(name);
 }
 
+constexpr std::array<std::string_view, 38> kFastOot = {
+    "RECOVERY_HEART", "STICK", "STICKS_5", "STICKS_10", "NUTS_5", "NUTS_5_ALT", "NUTS_10", "BOMB", "BOMBS_5",
+    "BOMBS_10", "BOMBS_20", "BOMBS_30", "BOMBCHU_5", "BOMBCHU_10", "BOMBCHU_20", "ARROWS_5", "ARROWS_10",
+    "ARROWS_30", "DEKU_SEEDS_5", "DEKU_SEEDS_30", "RUPEE_GREEN", "RUPEE_BLUE", "RUPEE_RED", "RUPEE_PURPLE",
+    "RUPEE_HUGE", "POTION_RED", "POTION_GREEN", "POTION_BLUE", "FISH", "BUGS", "BLUE_FIRE", "POE", "FAIRY", "MILK",
+    "MAGIC_JAR_SMALL", "MAGIC_JAR_LARGE", "BIG_POE", "FAIRY_BIG"
+};
+
+constexpr std::array<std::string_view, 36> kFastMm = {
+    "RECOVERY_HEART", "STICK", "NUT", "NUTS_5", "NUTS_10", "BOMB", "BOMBS_5", "BOMBS_10", "BOMBS_20", "BOMBS_30",
+    "BOMBCHU", "BOMBCHU_5", "BOMBCHU_10", "BOMBCHU_20", "ARROWS_10", "ARROWS_30", "ARROWS_40", "RUPEE_GREEN",
+    "RUPEE_BLUE", "RUPEE_RED", "RUPEE_PURPLE", "RUPEE_SILVER", "RUPEE_GOLD", "POTION_RED", "POTION_GREEN",
+    "POTION_BLUE", "FAIRY", "MILK", "CHATEAU", "FISH", "BUGS", "POE", "MAGIC_JAR_SMALL", "MAGIC_JAR_LARGE",
+    "BIG_POE", "FAIRY_BIG"
+};
+
+bool InFastList(std::string_view base, std::string_view game) {
+    const auto matches = [base](const auto& list) { return std::find(list.begin(), list.end(), base) != list.end(); };
+    if (game == "OOT") {
+        return matches(kFastOot);
+    }
+    if (game == "MM") {
+        return matches(kFastMm);
+    }
+    return matches(kFastOot) || matches(kFastMm);
+}
+
 } // namespace
 
 void OotmmItemCatalog::Reset() {
@@ -345,6 +372,15 @@ bool OotmmItemCatalog::IsTrap(std::string_view itemId) {
 
 bool OotmmItemCatalog::IsNothing(std::string_view itemId) {
     return itemId == "NOTHING";
+}
+
+bool OotmmItemCatalog::IsFast(std::string_view itemId) {
+    for (const std::string_view game : { "OOT", "MM", "SHARED" }) {
+        if (itemId.size() > game.size() + 1 && StartsWith(itemId, game) && itemId[game.size()] == '_') {
+            return InFastList(itemId.substr(game.size() + 1), game);
+        }
+    }
+    return false;
 }
 
 void OotmmInventory::Reset() {
