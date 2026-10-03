@@ -526,7 +526,7 @@ void Gui::DrawMenu() {
     if (!ImGui::DockBuilderGetNode(dockId)) {
         ImGui::DockBuilderRemoveNode(dockId);
         ImGui::DockBuilderAddNode(dockId, ImGuiDockNodeFlags_NoTabBar);
-        ImGui::DockBuilderSetNodeSize(dockId, ImVec2(viewport->Size.x, viewport->Size.y));
+        ImGui::DockBuilderSetNodeSize(dockId, ImVec2(std::max(viewport->Size.x, 1.0f), std::max(viewport->Size.y, 1.0f)));
 
         ImGui::DockBuilderDockWindow("Main Game", dockId);
 
