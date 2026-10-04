@@ -152,7 +152,12 @@ std::optional<OotmmItemDefinition> OotmmItemCatalog::Describe(std::string id, st
         .Name = DisplayName(id, std::move(name)),
     };
 
-    if (Contains(value, "_SOUL_")) {
+    if (EndsWith(value, "_BOMBCHU_BAG")) {
+        item.Category = "Upgrades";
+        item.Kind = OotmmItemValueKind::Progressive;
+        item.MaxValue = 3;
+        item.ModelKind = OotmmItemModelKind::Bombchu;
+    } else if (Contains(value, "_SOUL_")) {
         item.Category = "Souls";
         item.ModelKind = OotmmItemModelKind::Soul;
     } else if (Contains(value, "_BUTTON_")) {

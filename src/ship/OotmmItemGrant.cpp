@@ -106,7 +106,6 @@ bool OotmmItemGrant::IsInventoryBacked(OotmmGrantKind kind) {
     switch (kind) {
         case OotmmGrantKind::Soul:
         case OotmmGrantKind::RustyKey:
-        case OotmmGrantKind::SkeletonKey:
         case OotmmGrantKind::SpinUpgrade:
         case OotmmGrantKind::OcarinaButton:
         case OotmmGrantKind::SilverRupee:
@@ -131,6 +130,10 @@ std::vector<OotmmGrantOp> OotmmItemGrant::Resolve(std::string_view itemId, uint3
     const OotmmGrantGame game = GameOf(itemId);
     const std::string_view suffix = SuffixOf(itemId);
 
+    if (suffix == "BOMBCHU_BAG") {
+        ops.push_back(Op(OotmmGrantKind::Equipment, game, suffix, count));
+        return ops;
+    }
     if (Contains(itemId, "_SOUL_")) {
         ops.push_back(Op(OotmmGrantKind::Soul, game, suffix, 1));
         return ops;
@@ -220,7 +223,7 @@ std::vector<OotmmGrantOp> OotmmItemGrant::Resolve(std::string_view itemId, uint3
         ops.push_back(Op(OotmmGrantKind::Health, game, suffix, count));
         return ops;
     }
-    if (Contains(itemId, "_ARROWS_") || Contains(itemId, "_BOMBS_") ||
+    if (suffix == "BOMBCHU" || Contains(itemId, "_ARROWS_") || Contains(itemId, "_BOMBS_") ||
         Contains(itemId, "_BOMBCHU_") || Contains(itemId, "_NUTS_") ||
         Contains(itemId, "_STICKS_") || Contains(itemId, "_SEEDS_")) {
         ops.push_back(Op(OotmmGrantKind::Ammo, game, suffix, count));
