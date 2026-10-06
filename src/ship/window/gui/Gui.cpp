@@ -51,6 +51,18 @@ IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARA
 #endif
 
 namespace Ship {
+
+namespace {
+bool RuntimeTestActive() {
+#if !defined(NDEBUG) || defined(OOTMM_RUNTIME_TEST)
+    const char* directory = std::getenv("OOTMM_RUNTIME_TEST_DIR");
+    return directory != nullptr && directory[0] != '\0';
+#else
+    return false;
+#endif
+}
+} // namespace
+
 #define TOGGLE_BTN ImGuiKey_F1
 #define TOGGLE_PAD_BTN ImGuiKey_GamepadBack
 
@@ -125,7 +137,7 @@ void Gui::Init(GuiWindowInitData windowImpl) {
     mImGuiIo->IniFilename = mImGuiIniPath.c_str();
     mImGuiIo->LogFilename = mImGuiLogPath.c_str();
 
-    if (!IsWindowEmbedded() && SupportsViewports() &&
+    if (!IsWindowEmbedded() && !RuntimeTestActive() && SupportsViewports() &&
         Ship::Context::GetInstance()->GetConsoleVariables()->GetInteger(CVAR_ENABLE_MULTI_VIEWPORTS, 1)) {
         mImGuiIo->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
     }

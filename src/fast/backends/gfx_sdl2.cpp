@@ -373,6 +373,11 @@ void GfxWindowBackendSDL2::Init(const char* gameName, const char* gfxApiName, bo
         flags = flags | SDL_WINDOW_METAL;
     }
 
+#if !defined(NDEBUG) || defined(OOTMM_RUNTIME_TEST)
+    if (const char* directory = std::getenv("OOTMM_RUNTIME_TEST_DIR"); directory != nullptr && directory[0] != '\0') {
+        SDL_SetHint(SDL_HINT_WINDOW_NO_ACTIVATION_WHEN_SHOWN, "1");
+    }
+#endif
     mWnd = SDL_CreateWindow(title, posX, posY, mWindowWidth, mWindowHeight, flags);
 #ifdef _WIN32
     // Get Windows window handle and use it to subclass the window procedure.

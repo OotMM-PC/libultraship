@@ -85,6 +85,15 @@ void GfxWindowBackendDXGI::ApplyMaxFrameLatency(bool first) {
     mAppliedMaxFrameLatency = mMaxFrameLatency;
 }
 
+static bool RuntimeTestActive() {
+#if !defined(NDEBUG) || defined(OOTMM_RUNTIME_TEST)
+    const char* directory = std::getenv("OOTMM_RUNTIME_TEST_DIR");
+    return directory != nullptr && directory[0] != '\0';
+#else
+    return false;
+#endif
+}
+
 static std::vector<std::tuple<HMONITOR, RECT, BOOL>> GetMonitorList() {
     std::vector<std::tuple<HMONITOR, RECT, BOOL>> monitors;
     EnumDisplayMonitors(
@@ -590,17 +599,24 @@ void GfxWindowBackendDXGI::Init(const char* game_name, const char* gfx_api_name,
         posY = 100;
     }
 
+    if (RuntimeTestActive()) {
+        DisableProcessWindowsGhosting();
+    }
     if (const auto parent = reinterpret_cast<HWND>(Ship::GetExternalWindowParent())) {
         h_wnd = CreateWindowW(WINCLASS_NAME, w_title, WS_CHILD | WS_CLIPSIBLINGS, 0, 0, width, height, parent, nullptr,
                               nullptr, this);
     } else {
-        h_wnd = CreateWindowW(WINCLASS_NAME, w_title, WS_OVERLAPPEDWINDOW, posX + wr.left, posY + wr.top,
-                              current_width, current_height, nullptr, nullptr, nullptr, this);
+        h_wnd = CreateWindowExW(RuntimeTestActive() ? WS_EX_NOACTIVATE : 0, WINCLASS_NAME, w_title, WS_OVERLAPPEDWINDOW,
+                                posX + wr.left, posY + wr.top, current_width, current_height, nullptr, nullptr, nullptr,
+                                this);
     }
 
     LoadDxgi();
 
-    ShowWindow(h_wnd, SW_SHOW);
+    ShowWindow(h_wnd, RuntimeTestActive() ? SW_SHOWNOACTIVATE : SW_SHOW);
+    if (RuntimeTestActive()) {
+        SetWindowPos(h_wnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    }
     UpdateWindow(h_wnd);
 
     // Get refresh rate

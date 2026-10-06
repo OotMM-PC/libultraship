@@ -61,6 +61,12 @@ void Audio::Init() {
     mAvailableAudioBackends->push_back(AudioBackend::SDL);
     mAvailableAudioBackends->push_back(AudioBackend::NUL);
 
+#if !defined(NDEBUG) || defined(OOTMM_RUNTIME_TEST)
+    if (const char* directory = std::getenv("OOTMM_RUNTIME_TEST_DIR"); directory != nullptr && directory[0] != '\0') {
+        mAudioBackend = AudioBackend::NUL;
+        return;
+    }
+#endif
     SetCurrentAudioBackend(Context::GetInstance()->GetConfig()->GetCurrentAudioBackend());
 }
 

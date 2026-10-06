@@ -108,8 +108,10 @@ bool Context::InitLogging(spdlog::level::level_enum debugBuildLogLevel,
 
 #if (!defined(_WIN32)) || defined(_DEBUG)
         const bool isEmbedded = IsWindowEmbedded();
+        const char* runtimeTestDirectory = std::getenv("OOTMM_RUNTIME_TEST_DIR");
+        const bool runtimeTest = runtimeTestDirectory != nullptr && runtimeTestDirectory[0] != '\0';
 #if defined(_DEBUG) && defined(_WIN32)
-        if (!isEmbedded) {
+        if (!isEmbedded && !runtimeTest) {
             // LLVM on Windows allocs a hidden console in its entrypoint function.
             // We free that console here to create our own.
             FreeConsole();
@@ -143,7 +145,7 @@ bool Context::InitLogging(spdlog::level::level_enum debugBuildLogLevel,
             std::wcin.clear();
         }
 #endif
-        if (!isEmbedded) {
+        if (!isEmbedded && !runtimeTest) {
             auto systemConsoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
             // systemConsoleSink->set_level(spdlog::level::trace);
             sinks.push_back(systemConsoleSink);

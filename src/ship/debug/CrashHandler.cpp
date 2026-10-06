@@ -1,3 +1,5 @@
+#include <csignal>
+#include <cstdlib>
 #include <spdlog/spdlog.h>
 #include "ship/utils/StringHelper.h"
 #include "ship/debug/CrashHandler.h"
@@ -417,6 +419,14 @@ extern "C" LONG WINAPI seh_filter(PEXCEPTION_POINTERS ex) {
     return EXCEPTION_EXECUTE_HANDLER;
 }
 
+static void abort_handler(int) {
+    CONTEXT ctx;
+    RtlCaptureContext(&ctx);
+    std::shared_ptr<CrashHandler> crashHandler = Context::GetInstance()->GetCrashHandler();
+    crashHandler->AppendLine("ABORT");
+    crashHandler->PrintStack(&ctx);
+}
+
 #endif
 
 CrashHandler::CrashHandler() {
@@ -441,6 +451,11 @@ CrashHandler::CrashHandler() {
     sigaction(SIGKILL, &shutdownAction, nullptr);
 #elif defined(_WIN32)
     SetUnhandledExceptionFilter(seh_filter);
+    signal(SIGABRT, abort_handler);
+    if (std::getenv("OOTMM_RUNTIME_TEST_DIR") != nullptr) {
+        _set_error_mode(_OUT_TO_STDERR);
+        _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+    }
 #endif
 }
 
