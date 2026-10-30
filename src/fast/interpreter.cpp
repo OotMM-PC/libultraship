@@ -3103,6 +3103,13 @@ bool gfx_vtx_hash_handler_custom(F3DGfx** cmd0) {
     return false;
 }
 
+static void ReportMissingResource(const char* kind, const char* path) {
+    static std::set<std::string> reported;
+    if (reported.insert(path).second) {
+        SPDLOG_ERROR("Skipping missing {} resource {}", kind, path);
+    }
+}
+
 bool gfx_vtx_otr_filepath_handler_custom(F3DGfx** cmd0) {
     Interpreter* gfx = mInstance.lock().get();
     F3DGfx* cmd = *cmd0;
@@ -3114,6 +3121,10 @@ bool gfx_vtx_otr_filepath_handler_custom(F3DGfx** cmd0) {
     size_t vtxDataOff = cmd->words.w1 & 0xFFFF;
     F3DVtx* vtx =
         (F3DVtx*)Ship::Context::GetInstance()->GetResourceManager()->GetResourceRawPointer((const char*)fileName);
+    if (vtx == nullptr) {
+        ReportMissingResource("vertex", fileName);
+        return false;
+    }
     vtx += vtxDataOff;
 
     gfx->GfxSpVertex(vtxCnt, vtxIdxOff, vtx);
@@ -3126,19 +3137,20 @@ bool gfx_dl_otr_filepath_handler_custom(F3DGfx** cmd0) {
     F3DGfx* nDL =
         (F3DGfx*)Ship::Context::GetInstance()->GetResourceManager()->GetResourceRawPointer((const char*)fileName);
 
-    if (C0(16, 1) == 0 && nDL != nullptr) {
+    if (nDL == nullptr) {
+        ReportMissingResource("display list", fileName);
+        if (C0(16, 1) == 0) {
+            return false;
+        }
+        *cmd0 = g_exec_stack.ret();
+        return true;
+    }
+    if (C0(16, 1) == 0) {
         g_exec_stack.call(*cmd0, nDL);
     } else {
-        if (nDL != nullptr) {
-            (*cmd0) = nDL;
-            g_exec_stack.branch(cmd);
-            return true; // shortcut cmd increment
-        } else {
-            assert(0 && "???");
-            // gfx_path.pop_back();
-            // cmd = cmd_stack.top();
-            // cmd_stack.pop();
-        }
+        (*cmd0) = nDL;
+        g_exec_stack.branch(cmd);
+        return true; // shortcut cmd increment
     }
     return false;
 }
