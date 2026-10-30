@@ -27,8 +27,6 @@ std::filesystem::path ManifestPath(const std::string& modsDirectory) {
     return std::filesystem::path(modsDirectory) / "loadorder.txt";
 }
 
-// Launcher-generated archives (ported local models, co-op fills) never appear in the manifest
-// and must win anyway: they mount after everything, ranked or not.
 bool IsPinnedLast(const std::string& fileOrPath) {
     const size_t slash = fileOrPath.find_last_of("/\\");
     const std::string name = slash == std::string::npos ? fileOrPath : fileOrPath.substr(slash + 1);
@@ -53,7 +51,6 @@ std::vector<std::string> ModLoadOrder::Read(const std::string& modsDirectory) {
     while (std::getline(in, line)) {
         if (first) {
             first = false;
-            // A hand-edited manifest may lead with a UTF-8 BOM, which would corrupt the first entry.
             if (line.rfind("\xEF\xBB\xBF", 0) == 0) {
                 line.erase(0, 3);
             }
@@ -96,12 +93,12 @@ void ModLoadOrder::SortForMounting(std::vector<std::string>& filesOrPaths, const
                          const int rankA = RankOf(order, a);
                          const int rankB = RankOf(order, b);
                          if ((rankA < 0) != (rankB < 0)) {
-                             return rankA < 0; // unlisted mounts first, so ranked archives override it
+                             return rankA < 0;
                          }
                          if (rankA < 0) {
-                             return false; // both unlisted: keep the caller's order
+                             return false;
                          }
-                         return rankA > rankB; // the top line mounts last and therefore wins
+                         return rankA > rankB;
                      });
 }
 

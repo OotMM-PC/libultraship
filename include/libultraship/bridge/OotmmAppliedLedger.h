@@ -7,8 +7,6 @@
 
 namespace Ship {
 
-/// Records how much of each OoTMM item has already been written into the native
-/// save, so counters apply deltas instead of re-applying on every reload.
 class OotmmAppliedLedger {
   public:
     void Reset();

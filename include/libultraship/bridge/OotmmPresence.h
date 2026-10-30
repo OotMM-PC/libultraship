@@ -15,17 +15,11 @@ struct OotmmPlayerPose {
     int RoomId = 0;
     float Pos[3] = { 0.0f, 0.0f, 0.0f };
     int16_t Yaw = 0;
-    // Recomputed every frame (swim bob, riding); a puppet that skips it floats or sinks.
     float YOffset = 0.0f;
-    // skelAnime.movementFlags, which condition the root-limb scaling the draw applies.
     int MoveFlags = 0;
-    // OoT: age (0 adult, 1 child). MM: transformation (0 FD .. 4 Human).
     int Form = 0;
-    // MM human form's model source: 0 vanilla, 1 ported OoT child, 2 ported OoT adult.
-    // Receivers pick the puppet's skeleton and face textures from it.
     int HumanModel = 0;
     uint32_t Seq = 0;
-    // "" = the skeleton's own limb DL, "-" = draw nothing.
     std::string DlLeftHand;
     std::string DlRightHand;
     std::string DlSheath;
@@ -36,9 +30,7 @@ struct OotmmPlayerPose {
     int Boots = 0;
     int Strength = 0;
     int Mask = 0;
-    // Custom equipment resolves to a loaded Gfx with no path, so it cannot ride the DL fields
-    // above; the receiver replays the sender's draw conditions from these instead.
-    int ItemAction = -1; // heldItemAction in OoT, itemAction in MM
+    int ItemAction = -1;
     int CustomMask = 0;
     int Shield = 0;
     int SheathType = 0;
@@ -59,7 +51,6 @@ struct OotmmPvpHit {
 
 class OotmmPresenceIo {
   public:
-    /// Bare objects with no envelope; callers add their own.
     static std::string SerializePose(const OotmmPlayerPose& pose);
     static std::string SerializePvpHit(const OotmmPvpHit& hit);
     static bool ParseRoster(const std::string& json, std::vector<OotmmPlayerPose>& poses);

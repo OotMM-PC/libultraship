@@ -11,7 +11,6 @@ bool OotmmSwimNeedsScale(const OotmmGameState& state, OotmmGame game) {
     if (!state.GetBoolSetting("bronzeScale", false)) {
         return false;
     }
-    // MM only carries scales when the seed asks for them; otherwise its water stays vanilla.
     return game == OotmmGame::Oot || state.GetBoolSetting("scalesMm", false);
 }
 
@@ -28,7 +27,6 @@ OotmmScaleTier OotmmScaleTierOf(const OotmmGameState& state, const OotmmInventor
     if (count == 0) {
         return OotmmScaleTier::None;
     }
-    // Without the bronze rung the seed's first scale is already the Silver one.
     if (!state.GetBoolSetting("bronzeScale", false)) {
         count++;
     }

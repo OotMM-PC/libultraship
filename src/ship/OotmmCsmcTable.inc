@@ -1,7 +1,4 @@
-﻿// Auto-generated from OoTMM's item definitions (933 entries). DO NOT EDIT.
-// Maps each OoTMM item id to its container-appearance class (the item's intrinsic type).
-// Regenerate when OoTMM adds items. HEART/MAP_COMPASS collapse to Normal at runtime when
-// csmcHearts/csmcMapCompass are off; the bagFirst bombchu special-case is applied at runtime.
+// Generated from OoTMM's item definitions; regenerate instead of editing.
 static const std::pair<const char*, OotmmCsmcClass> kOotmmCsmcItemType[] = {
     { "OOT_BOMBS_5", OotmmCsmcClass::Normal },
     { "OOT_NUTS_5", OotmmCsmcClass::Normal },

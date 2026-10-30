@@ -46,7 +46,6 @@ struct OotmmPlacement {
     std::string ItemGame;
     std::string ItemId;
     std::string ItemName;
-    // The decoy the location displays until collected; empty = show the real item.
     std::string CloakItemId;
     std::string CloakItemName;
     uint32_t OwnerPlayer = 0;
@@ -148,7 +147,6 @@ class OotmmGameState {
     bool GetBoolSetting(const std::string& name, bool fallback = false) const;
     std::string GetStringSetting(const std::string& name, std::string fallback = {}) const;
     int GetIntSetting(const std::string& name, int fallback = 0) const;
-    /// Frames the Blast Mask takes to recharge, from the seed's blastMaskCooldown setting.
     uint16_t GetBlastMaskCooldownFrames() const;
     bool IsSpecialCondMet(const std::string& name, const OotmmInventory& inventory) const;
     bool HasWorldFlag(const std::string& name) const;
@@ -164,14 +162,12 @@ class OotmmGameState {
     std::optional<uint16_t> GetPrice(uint32_t index) const;
     std::optional<uint32_t> ResolveBossWarp(uint32_t bossId, bool woodfallTempleRaised) const;
     std::optional<uint32_t> GetBossDungeon(uint32_t bossId) const;
-    /// Per-event shuffled song ids (0-19); empty when the seed predates the field.
     const std::vector<uint8_t>& GetSongEventsOot() const;
     const std::vector<uint8_t>& GetSongEventsMm() const;
     const std::vector<OotmmPlacement>& GetPlacements() const;
     const OotmmHints& GetHints() const;
     std::string GetGossipHint(OotmmGame game, uint32_t key) const;
     const OotmmPlacement* FindCheckById(OotmmGame game, const std::string& checkId) const;
-    /// The check at an in-world location, keyed the way the seed identifies it.
     const OotmmPlacement* FindCheck(OotmmGame game, uint32_t scene, const std::string& type,
                                     uint32_t flag) const;
     const OotmmPlacement* FindCheck(OotmmGame game, const std::string& type,

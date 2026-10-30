@@ -268,7 +268,6 @@ bool OotmmGameState::GetBoolSetting(const std::string& name, bool fallback) cons
 }
 
 uint16_t OotmmGameState::GetBlastMaskCooldownFrames() const {
-    // The frame counts OoTMM's own patch uses for each setting value.
     const std::string value = GetStringSetting("blastMaskCooldown", "default");
     if (value == "instant") {
         return 0x001;
@@ -548,7 +547,6 @@ bool OotmmGameState::LoadSeed() {
         if (it->is_number_unsigned()) {
             sessionEpoch = it->get<uint32_t>();
         } else if (it->is_string()) {
-            // The launcher accepts the string form too; the save tag must agree with it.
             const std::string text = it->get<std::string>();
             if (!text.empty() && text.find_first_not_of("0123456789") == std::string::npos) {
                 sessionEpoch = static_cast<uint32_t>(std::strtoull(text.c_str(), nullptr, 10));

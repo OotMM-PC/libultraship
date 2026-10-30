@@ -26,7 +26,6 @@ const std::unordered_map<std::string, OotmmCsmcClass>& TypeTable() {
 
 OotmmCsmcClass LookupItem(OotmmGame game, const std::string& itemId) {
     const auto& table = TypeTable();
-    // Shared items resolve to the hosting game's entry, falling back to the other game's.
     if (itemId.rfind("SHARED_", 0) == 0) {
         const std::string suffix = itemId.substr(7);
         const char* self = game == OotmmGame::Oot ? "OOT_" : "MM_";
@@ -43,7 +42,6 @@ OotmmCsmcClass LookupItem(OotmmGame game, const std::string& itemId) {
     return entry == table.end() ? OotmmCsmcClass::Normal : entry->second;
 }
 
-// With bagFirst behavior the first bombchus are the progressive bag, so they read as major.
 bool IsBagFirstBombchu(const OotmmGameState& state, const std::string& itemId) {
     static const char* kOotChus[] = { "OOT_BOMBCHU_5", "OOT_BOMBCHU_10", "OOT_BOMBCHU_20" };
     static const char* kMmChus[] = { "MM_BOMBCHU", "MM_BOMBCHU_5", "MM_BOMBCHU_10", "MM_BOMBCHU_20" };

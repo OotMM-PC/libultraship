@@ -77,21 +77,15 @@ class GameIpcSession {
                                     std::optional<uint32_t> toNativeId, std::optional<uint32_t> ootAge);
     bool ConsumeTransitionAccepted();
 
-    /// Reports a collected check; queued and re-sent until the launcher acknowledges it,
-    /// so a dropped connection cannot lose the collection.
     bool SendCheckCollected(const std::string& game, const std::string& checkId, bool present = false);
     bool IsCheckPresentationPending(const std::string& key) const;
     void CompleteCheckPresentation(const std::string& key);
-    /// The launcher's durable record: acknowledged reports plus the connect-time snapshot.
     bool IsCheckCompleted(const std::string& game, const std::string& checkId) const;
     uint64_t CompletedChecksRevision() const;
 
-    /// True once the launcher is publishing rosters; solo sessions never see one.
     bool PresenceActive() const;
-    /// Lossy: an unchanged pose is dropped rather than framed.
     bool SendPlayerPose(const OotmmPlayerPose& pose);
     bool SendPvpHit(const OotmmPvpHit& hit);
-    /// Poses are last-value; hits accumulate so none is lost between game ticks.
     bool TakeRemotePresence(std::vector<OotmmPlayerPose>& poses, std::vector<OotmmPvpHit>& hits);
 
     bool Send(std::string message);
@@ -119,16 +113,11 @@ class GameIpcSession {
     bool mCheckRewardSupported = false;
     bool mTransitionAccepted = false;
 
-    // Held unparsed until the logic tick consumes it; discarding an unread roster is safe
-    // because poses are last-value.
     std::string mRemoteRoster;
     bool mRemoteRosterFresh = false;
     std::deque<OotmmPvpHit> mRemoteHits;
-    // Wall-clock, not a pump count: the pump runs per rendered frame, so a count would expire
-    // sooner on a fast display.
     std::chrono::steady_clock::time_point mPresenceUntil{};
     std::string mLastPoseSent;
-    // Keys are "game:checkId", matching the launcher's check identity.
     std::unordered_set<std::string> mCompletedChecks;
     std::vector<std::string> mPendingCheckReports;
     uint64_t mCompletedRevision = 0;

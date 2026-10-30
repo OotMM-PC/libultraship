@@ -146,7 +146,6 @@ std::vector<OotmmGrantOp> OotmmItemGrant::Resolve(std::string_view itemId, uint3
         ops.push_back(Op(OotmmGrantKind::OcarinaButton, game, suffix, count));
         return ops;
     }
-    // Must precede the generic _RUPEE branch, which would spend it as wallet money.
     if (Contains(itemId, "_RUPEE_SILVER_") || Contains(itemId, "_POUCH_SILVER_") ||
         suffix == "RUPEE_MAGICAL") {
         ops.push_back(Op(OotmmGrantKind::SilverRupee, game, suffix, count));

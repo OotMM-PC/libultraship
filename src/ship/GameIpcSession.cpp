@@ -272,8 +272,6 @@ void GameIpcSession::SendHello() {
 
 void GameIpcSession::HandleMessage(const std::string& message, GameIpcSettings& settings, OotmmInventory* inventory,
                                    bool& settingsChanged) try {
-    // Matched by prefix and stashed unparsed to keep this off the render path;
-    // BuildRemotePlayerPoses always emits type first, so the match is exact.
     if (message.compare(0, sizeof(kRosterPrefix) - 1, kRosterPrefix) == 0) {
         mPresenceUntil = std::chrono::steady_clock::now() + std::chrono::seconds(3);
         mRemoteRoster = message;

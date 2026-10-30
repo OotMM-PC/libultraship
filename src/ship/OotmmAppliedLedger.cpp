@@ -30,8 +30,6 @@ bool OotmmAppliedLedger::RestoreSnapshot(const nlohmann::json& snapshot) {
 }
 
 namespace {
-// Bumped when a fix changes what "already applied" means, so stale ledgers are dropped
-// instead of suppressing grants that never really landed.
 constexpr const char* kLedgerVersion = "#ootmm-applied-2";
 } // namespace
 
