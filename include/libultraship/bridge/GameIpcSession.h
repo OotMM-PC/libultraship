@@ -50,6 +50,7 @@ struct GameIpcSettings {
     bool SpeedSmooth = false;
     std::string TransportState = "healthy";
     uint32_t PendingChecks = 0;
+    int ZTargetHold = -1;
 };
 
 struct GameIpcItemPresentation {

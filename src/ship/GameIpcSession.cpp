@@ -369,6 +369,9 @@ void GameIpcSession::HandleMessage(const std::string& message, GameIpcSettings& 
         settings.SpeedSmooth = values.value("speedSmooth", settings.SpeedSmooth);
         settings.TransportState = values.value("transportState", settings.TransportState);
         settings.PendingChecks = values.value("pendingChecks", settings.PendingChecks);
+        if (values.contains("zTargetHold") && values["zTargetHold"].is_boolean()) {
+            settings.ZTargetHold = values["zTargetHold"].get<bool>() ? 1 : 0;
+        }
         settings.Revision = revision;
         settingsChanged = true;
         return;
