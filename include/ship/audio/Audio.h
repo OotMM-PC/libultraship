@@ -27,6 +27,7 @@ class Audio {
 
   protected:
     void InitAudioPlayer();
+    std::shared_ptr<AudioPlayer> CreateAudioPlayer(AudioBackend backend);
 
   private:
     std::shared_ptr<AudioPlayer> mAudioPlayer;

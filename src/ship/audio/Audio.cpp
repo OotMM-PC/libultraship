@@ -13,30 +13,40 @@ Audio::~Audio() {
     SPDLOG_TRACE("destruct audio");
 }
 
-void Audio::InitAudioPlayer() {
-    switch (GetCurrentAudioBackend()) {
+std::shared_ptr<AudioPlayer> Audio::CreateAudioPlayer(AudioBackend backend) {
+    switch (backend) {
 #ifdef _WIN32
         case AudioBackend::WASAPI:
-            mAudioPlayer = std::make_shared<WasapiAudioPlayer>(this->mAudioSettings);
-            break;
+            return std::make_shared<WasapiAudioPlayer>(this->mAudioSettings);
 #endif
 #ifdef __APPLE__
         case AudioBackend::COREAUDIO:
-            mAudioPlayer = std::make_shared<CoreAudioAudioPlayer>(this->mAudioSettings);
-            break;
+            return std::make_shared<CoreAudioAudioPlayer>(this->mAudioSettings);
 #endif
         case AudioBackend::SDL:
-            mAudioPlayer = std::make_shared<SDLAudioPlayer>(this->mAudioSettings);
-            break;
+            return std::make_shared<SDLAudioPlayer>(this->mAudioSettings);
         default:
-            mAudioPlayer = std::make_shared<NullAudioPlayer>(this->mAudioSettings);
-            break;
+            return std::make_shared<NullAudioPlayer>(this->mAudioSettings);
+    }
+}
+
+void Audio::InitAudioPlayer() {
+    mAudioPlayer = CreateAudioPlayer(GetCurrentAudioBackend());
+    if (mAudioPlayer->Init()) {
+        return;
     }
 
-    if (mAudioPlayer && !mAudioPlayer->Init()) {
-        // Failed to initialize system audio player.
-        // Fallback to Null if the native system player does not work.
-        SetCurrentAudioBackend(AudioBackend::NUL);
+    for (const AudioBackend fallback : *mAvailableAudioBackends) {
+        if (fallback == GetCurrentAudioBackend()) {
+            continue;
+        }
+        mAudioPlayer = CreateAudioPlayer(fallback);
+        if (mAudioPlayer->Init()) {
+            SPDLOG_WARN("Audio backend {} failed to start; using {} for this session",
+                        static_cast<int>(GetCurrentAudioBackend()), static_cast<int>(fallback));
+            mAudioBackend = fallback;
+            return;
+        }
     }
 }
 
