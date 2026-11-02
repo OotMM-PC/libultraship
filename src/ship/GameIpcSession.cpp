@@ -428,6 +428,8 @@ void GameIpcSession::HandleMessage(const std::string& message, GameIpcSettings& 
             .ViewerPlayer = root.value("viewerPlayer", uint32_t{ 0 }),
             .Debug = root.value("debug", false),
             .CheckKey = checkKey,
+            .Background = root.value("background", false),
+            .Quiet = root.value("quiet", false),
         };
         mPresentations.push_back(std::move(presentation));
         if (!checkKey.empty()) {

@@ -63,6 +63,8 @@ struct GameIpcItemPresentation {
     uint32_t ViewerPlayer = 0;
     bool Debug = false;
     std::string CheckKey;
+    bool Background = false;
+    bool Quiet = false;
 };
 
 class GameIpcSession {
