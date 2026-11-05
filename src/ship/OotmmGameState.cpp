@@ -1,6 +1,7 @@
 #include "libultraship/bridge/OotmmGameState.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <fstream>
 #include <limits>
@@ -752,6 +753,26 @@ bool OotmmGameState::LoadSeed() {
     if (mNativeSaveTag.empty()) {
         mLastError = "seed does not have a filesystem-safe save tag";
         return false;
+    }
+
+    if (const auto cosmetics = root.find("cosmetics"); cosmetics != root.end() && cosmetics->is_object()) {
+        for (auto it = cosmetics->begin(); it != cosmetics->end(); ++it) {
+            if (it->is_boolean()) {
+                mBoolSettings.insert_or_assign("cosmetic." + it.key(), it->get<bool>());
+            }
+        }
+        if (const auto colors = cosmetics->find("colors"); colors != cosmetics->end() && colors->is_object()) {
+            for (auto it = colors->begin(); it != colors->end(); ++it) {
+                if (!it->is_string()) {
+                    continue;
+                }
+                const std::string hex = it->get<std::string>();
+                if (hex.size() == 7 && hex[0] == '#' &&
+                    std::all_of(hex.begin() + 1, hex.end(), [](unsigned char c) { return std::isxdigit(c) != 0; })) {
+                    mStringSettings.insert_or_assign("cosmetic.color." + it.key(), hex);
+                }
+            }
+        }
     }
 
     uint32_t sessionEpoch = 1;
