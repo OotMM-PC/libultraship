@@ -217,6 +217,7 @@ void OotmmGameState::Reset() {
     mEntrancesSong.clear();
     mPrices.clear();
     mBossIds.clear();
+    mDungeonEntrances.clear();
     mDungeonWarps.clear();
     mSongEventsOot.clear();
     mSongEventsMm.clear();
@@ -465,6 +466,223 @@ const std::string& OotmmHints::StaticReward(OotmmStaticReward reward) const {
     return index < StaticRewards.size() ? StaticRewards[index] : kNone;
 }
 
+namespace {
+constexpr const char* kRegionNamesOot[][2] = {
+    { "in", "the %ySacred Realm" },
+    { "inside", "the %gDeku Tree" },
+    { "inside", "%rDodongo's Cavern" },
+    { "inside", "%bJabu-Jabu" },
+    { "in", "the %gForest Temple" },
+    { "in", "the %rFire Temple" },
+    { "in", "the %bWater Temple" },
+    { "in", "the %ySpirit Temple" },
+    { "in", "the %pShadow Temple" },
+    { "at", "the %pBottom of the Well" },
+    { "in", "the %cIce Cavern" },
+    { "in", "%yGerudo Training Grounds" },
+    { "in", "the %yThieve's Hideout" },
+    { "inside", "%rGanon's Castle" },
+    { "in", "the %gKokiri Forest" },
+    { "in", "%yHyrule Field" },
+    { "in", "%yHyrule's Market" },
+    { "in", "%yLon Lon Ranch" },
+    { "in", "%yHyrule's Castle" },
+    { "in", "%rGanon's Castle Exterior" },
+    { "in", "the %gLost Woods" },
+    { "in", "the %gSacred Meadow" },
+    { "in", "%rKakariko" },
+    { "inside", "%pKakariko's Graveyard" },
+    { "on", "%rDeath Mountain's Trail" },
+    { "in", "%rDeath Mountain's Crater" },
+    { "in", "%rGoron City" },
+    { "in", "%bZora's River" },
+    { "in", "%bZora's Domain" },
+    { "in", "%bZora's Fountain" },
+    { "around", "%bLake Hylia" },
+    { "in", "the %yTemple of Time" },
+    { "in", "%yGerudo Valley" },
+    { "around", "%yGerudo Fortress" },
+    { "in", "the %yHaunted Wastelands" },
+    { "around", "the %yDesert Colossus" },
+    { "inside", "an %yEgg" },
+    { "inside", "%rGanon's Castle Tower" },
+};
+constexpr const char* kRegionNamesMm[][2] = {
+    { "in", "%gWoodfall Temple" },
+    { "in", "%cSnowhead Temple" },
+    { "in", "%bGreat Bay Temple" },
+    { "in", "%yStone Tower Temple" },
+    { "in", "%ySouth Clock Town" },
+    { "in", "%yNorth Clock Town" },
+    { "in", "%yEast Clock Town" },
+    { "in", "%yWest Clock Town" },
+    { "in", "the %yLaundry Pool" },
+    { "inside", "the %pGiant's Dream" },
+    { "on", "%yClock Tower Roof" },
+    { "in", "the %rStock Pot Inn" },
+    { "in", "%rTermina Field" },
+    { "on", "the %gRoad to the Swamp" },
+    { "in", "the %gSouthern Swamp" },
+    { "in", "%gDeku Palace" },
+    { "in", "%gWoodfall" },
+    { "on", "the %rPath to Mountain Village" },
+    { "in", "the %rMountain Village" },
+    { "on", "the %rPath to Snowhead" },
+    { "around", "%rTwin Islands" },
+    { "around", "%rGoron Village" },
+    { "in", "%rSnowhead" },
+    { "around", "the %pMilk Road" },
+    { "around", "%yRomani Ranch" },
+    { "around", "%bGreat Bay Coast" },
+    { "in", "the %bPirate's Fortress Exterior" },
+    { "in", "the %bPirate's Fortress Sewers" },
+    { "in", "the %bPirate's Fortress Interior" },
+    { "around", "%bZora Cape" },
+    { "in", "%bZora Hall" },
+    { "in", "%bPinnacle Rock" },
+    { "on", "the %yRoad to Ikana" },
+    { "in", "%pIkana's Graveyard" },
+    { "in", "%yIkana Canyon" },
+    { "in", "the %yAncient Castle of Ikana" },
+    { "somewhere", "%pBeneath The Well" },
+    { "in", "a %ySecret Shrine" },
+    { "on", "the %yStone Tower" },
+    { "on", "the %rMoon" },
+    { "in", "the %gSwamp Spider House" },
+    { "in", "the %bOcean Spider House" },
+    { "from", "%gTingle" },
+    { "in", "%yInverted Stone Tower Temple" },
+    { "inside", "the %gButler Race" },
+    { "inside", "the %rGoron Racetrack" },
+};
+constexpr const char* kDungeonNames[] = {
+    "%gDeku Tree%w",
+    "%rDodongo's Cavern%w",
+    "%bJabu-Jabu%w",
+    "%gForest Temple%w",
+    "%rFire Temple%w",
+    "%bWater Temple%w",
+    "%pShadow Temple%w",
+    "%ySpirit Temple%w",
+    "%gWoodfall Temple%w",
+    "%rSnowhead Temple%w",
+    "%bGreat Bay Temple%w",
+    "%yStone Tower Temple (Inverted)%w",
+    "%yStone Tower Temple%w",
+    "%gSwamp Spider House%w",
+    "%bOcean Spider House%w",
+    "%pBottom of the Well%w",
+    "%bIce Cavern%w",
+    "%yGerudo Training Grounds%w",
+    "%pBeneath The Well%w",
+    "%yIkana Castle%w",
+    "%ySecret Shrine%w",
+    "%pBeneath The Well (End)%w",
+    "%bPirate Fortress%w",
+    "%rGanon's Castle%w",
+    "%rGanon's Tower%w",
+    "%yClock Tower Roof%w",
+};
+constexpr const char* kBossNames[] = {
+    "%gGohma%w",
+    "%rKing Dodongo%w",
+    "%bBarinade%w",
+    "%gPhantom Ganon%w",
+    "%rVolvagia%w",
+    "%bMorpha%w",
+    "%pBongo Bongo%w",
+    "%yTwinrova%w",
+    "%gOdolwa%w",
+    "%rGoht%w",
+    "%bGyorg%w",
+    "%yTwinmold%w",
+};
+
+constexpr uint32_t kDungeonStoneTowerInverted = 0x0B;
+constexpr uint32_t kDungeonStoneTower = 0x0C;
+
+int DungeonOfItem(const std::string& suffix) {
+    static const std::unordered_map<std::string, int> kDungeons = {
+        { "OOT_DT", 0x00 },     { "OOT_DC", 0x01 },     { "OOT_JJ", 0x02 },    { "OOT_FOREST", 0x03 },
+        { "OOT_FIRE", 0x04 },   { "OOT_WATER", 0x05 },  { "OOT_SHADOW", 0x06 }, { "OOT_SPIRIT", 0x07 },
+        { "OOT_BOTW", 0x0F },   { "OOT_IC", 0x10 },     { "MM_WF", 0x08 },     { "MM_SH", 0x09 },
+        { "MM_GB", 0x0A },      { "MM_ST", 0x0C },
+    };
+    const auto found = kDungeons.find(suffix);
+    return found == kDungeons.end() ? -1 : found->second;
+}
+
+std::string RegionText(uint32_t regionId) {
+    const uint8_t id = static_cast<uint8_t>(regionId);
+    if (id == 0x00) {
+        return "%pnowhere%w";
+    }
+    if (id == 0xFF) {
+        return "inside %yLink's Pocket%w";
+    }
+    if (id == 0xFE) {
+        return "in a %pNameless Place%w";
+    }
+    const size_t index = static_cast<size_t>(id & 0x7F) - 1;
+    if (id & 0x80) {
+        if (index >= std::size(kRegionNamesMm)) {
+            return {};
+        }
+        return std::string(kRegionNamesMm[index][0]) + " " + kRegionNamesMm[index][1] + "%w";
+    }
+    if (index >= std::size(kRegionNamesOot)) {
+        return {};
+    }
+    return std::string(kRegionNamesOot[index][0]) + " " + kRegionNamesOot[index][1] + "%w";
+}
+} // namespace
+
+std::string OotmmGameState::DungeonEntranceText(uint32_t dungeonId) const {
+    if (dungeonId >= mDungeonEntrances.size()) {
+        return {};
+    }
+    const OotmmDungeonEntrance& entry = mDungeonEntrances[dungeonId];
+    if (!entry.Replace) {
+        return RegionText(entry.Value);
+    }
+    return entry.Value < std::size(kDungeonNames) ? std::string("at ") + kDungeonNames[entry.Value] : std::string();
+}
+
+std::string OotmmGameState::DungeonItemText(const std::string& itemId) const {
+    const auto gameEnd = itemId.find('_');
+    if (gameEnd == std::string::npos) {
+        return {};
+    }
+    const std::string game = itemId.substr(0, gameEnd);
+    const std::string kind = itemId.substr(gameEnd + 1);
+    if (kind.rfind("MAP_", 0) == 0) {
+        const int dungeon = DungeonOfItem(game + "_" + kind.substr(4));
+        if (dungeon < 0 || GetStringSetting("erDungeons", "none") == "none") {
+            return {};
+        }
+        if (static_cast<uint32_t>(dungeon) == kDungeonStoneTower) {
+            return "\nThe entrances are " + DungeonEntranceText(kDungeonStoneTower) + " and " +
+                   DungeonEntranceText(kDungeonStoneTowerInverted) + ".";
+        }
+        return "\nThe entrance is " + DungeonEntranceText(static_cast<uint32_t>(dungeon)) + ".";
+    }
+    if (kind.rfind("COMPASS_", 0) == 0) {
+        int dungeon = DungeonOfItem(game + "_" + kind.substr(8));
+        if (dungeon < 0 || GetStringSetting("erBoss", "none") == "none") {
+            return {};
+        }
+        if (static_cast<uint32_t>(dungeon) == kDungeonStoneTower) {
+            dungeon = kDungeonStoneTowerInverted;
+        }
+        for (size_t boss = 0; boss < mBossIds.size() && boss < std::size(kBossNames); boss++) {
+            if (mBossIds[boss] == dungeon) {
+                return std::string("\nIt points at ") + kBossNames[boss] + ".";
+            }
+        }
+    }
+    return {};
+}
+
 const OotmmHints& OotmmGameState::GetHints() const {
     return mHints;
 }
@@ -623,6 +841,16 @@ bool OotmmGameState::LoadSeed() {
                     }
                 }
             }
+        }
+    }
+
+    const auto dungeonEntrances = root.find("dungeonEntrances");
+    if (dungeonEntrances != root.end() && dungeonEntrances->is_array()) {
+        for (const auto& entry : *dungeonEntrances) {
+            OotmmDungeonEntrance parsed;
+            parsed.Replace = ReadString(entry, "type") == "replace";
+            parsed.Value = entry.value(parsed.Replace ? "entranceIndex" : "regionId", 0u);
+            mDungeonEntrances.push_back(parsed);
         }
     }
 

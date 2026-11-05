@@ -57,6 +57,11 @@ struct OotmmPlacement {
     }
 };
 
+struct OotmmDungeonEntrance {
+    bool Replace = false;
+    uint32_t Value = 0;
+};
+
 struct OotmmHintRegion {
     uint32_t RegionId = 0;
     std::string Text;
@@ -166,6 +171,8 @@ class OotmmGameState {
     const std::vector<uint8_t>& GetSongEventsMm() const;
     const std::vector<OotmmPlacement>& GetPlacements() const;
     const OotmmHints& GetHints() const;
+    std::string DungeonEntranceText(uint32_t dungeonId) const;
+    std::string DungeonItemText(const std::string& itemId) const;
     std::string GetGossipHint(OotmmGame game, uint32_t key) const;
     const OotmmPlacement* FindCheckById(OotmmGame game, const std::string& checkId) const;
     const OotmmPlacement* FindCheck(OotmmGame game, uint32_t scene, const std::string& type,
@@ -198,6 +205,7 @@ class OotmmGameState {
     std::vector<uint32_t> mEntrancesSong;
     std::vector<uint16_t> mPrices;
     std::vector<uint8_t> mBossIds;
+    std::vector<OotmmDungeonEntrance> mDungeonEntrances;
     std::vector<uint32_t> mDungeonWarps;
     std::vector<uint8_t> mSongEventsOot;
     std::vector<uint8_t> mSongEventsMm;
