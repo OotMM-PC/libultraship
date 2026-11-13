@@ -41,6 +41,32 @@ inline constexpr const char* CrossGameTransition = "crossGameTransition";
 inline constexpr const char* TransitionAccepted = "transitionAccepted";
 } // namespace GameIpcMessageType
 
+struct GameIpcKnockbackChance {
+    uint32_t Percent = 0;
+    float Distance = 0.0f;
+};
+
+struct GameIpcTrapTuning {
+    int IceBreakoutPercent = 100;
+    int IceDamage = 0;
+    int FireDamage = 0;
+    int FireDuration = 200;
+    int ShockDamage = 0;
+    int ShockDuration = 20;
+    std::vector<GameIpcKnockbackChance> Knockback;
+
+    const GameIpcKnockbackChance* PickKnockback(float roll) const {
+        float cumulative = 0.0f;
+        for (const auto& chance : Knockback) {
+            cumulative += static_cast<float>(chance.Percent);
+            if (roll < cumulative) {
+                return &chance;
+            }
+        }
+        return nullptr;
+    }
+};
+
 struct GameIpcSettings {
     uint64_t Revision = 0;
     bool ShowNames = true;
@@ -51,6 +77,7 @@ struct GameIpcSettings {
     std::string TransportState = "healthy";
     uint32_t PendingChecks = 0;
     int ZTargetHold = -1;
+    GameIpcTrapTuning Traps;
 };
 
 struct GameIpcItemPresentation {

@@ -372,6 +372,33 @@ void GameIpcSession::HandleMessage(const std::string& message, GameIpcSettings& 
         if (values.contains("zTargetHold") && values["zTargetHold"].is_boolean()) {
             settings.ZTargetHold = values["zTargetHold"].get<bool>() ? 1 : 0;
         }
+        if (values.contains("traps") && values["traps"].is_object()) {
+            const auto& traps = values["traps"];
+            GameIpcTrapTuning tuning;
+            tuning.IceBreakoutPercent = std::clamp(traps.value("iceBreakoutPercent", tuning.IceBreakoutPercent), 25, 400);
+            tuning.IceDamage = std::clamp(traps.value("iceDamage", tuning.IceDamage), 0, 320);
+            tuning.FireDamage = std::clamp(traps.value("fireDamage", tuning.FireDamage), 0, 320);
+            tuning.FireDuration = std::clamp(traps.value("fireDuration", tuning.FireDuration), 0, 600);
+            tuning.ShockDamage = std::clamp(traps.value("shockDamage", tuning.ShockDamage), 0, 320);
+            tuning.ShockDuration = std::clamp(traps.value("shockDuration", tuning.ShockDuration), 1, 200);
+            uint32_t total = 0;
+            if (traps.contains("knockback") && traps["knockback"].is_array()) {
+                for (const auto& row : traps["knockback"]) {
+                    if (!row.is_object() || !row.contains("percent") || !row["percent"].is_number_unsigned() ||
+                        !row.contains("distance") || !row["distance"].is_number()) {
+                        continue;
+                    }
+                    const uint32_t percent = row["percent"].get<uint32_t>();
+                    const float distance = row["distance"].get<float>();
+                    if (percent == 0 || total + percent > 100 || distance < 0.0f || distance > 2000.0f) {
+                        continue;
+                    }
+                    total += percent;
+                    tuning.Knockback.push_back({ percent, distance });
+                }
+            }
+            settings.Traps = std::move(tuning);
+        }
         settings.Revision = revision;
         settingsChanged = true;
         return;
