@@ -43,15 +43,16 @@ inline constexpr const char* TransitionAccepted = "transitionAccepted";
 
 struct GameIpcKnockbackChance {
     uint32_t Percent = 0;
-    float Distance = 0.0f;
+    float MinDistance = 0.0f;
+    float MaxDistance = 0.0f;
 };
 
 struct GameIpcTrapTuning {
     int IceBreakoutPercent = 100;
-    int IceDamage = 0;
-    int FireDamage = 0;
+    int IceDamagePercent = 100;
+    int FireDamagePercent = 100;
     int FireDuration = 200;
-    int ShockDamage = 0;
+    int ShockDamagePercent = 100;
     int ShockDuration = 20;
     std::vector<GameIpcKnockbackChance> Knockback;
 

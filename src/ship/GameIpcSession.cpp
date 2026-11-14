@@ -376,25 +376,28 @@ void GameIpcSession::HandleMessage(const std::string& message, GameIpcSettings& 
             const auto& traps = values["traps"];
             GameIpcTrapTuning tuning;
             tuning.IceBreakoutPercent = std::clamp(traps.value("iceBreakoutPercent", tuning.IceBreakoutPercent), 25, 400);
-            tuning.IceDamage = std::clamp(traps.value("iceDamage", tuning.IceDamage), 0, 320);
-            tuning.FireDamage = std::clamp(traps.value("fireDamage", tuning.FireDamage), 0, 320);
+            tuning.IceDamagePercent = std::clamp(traps.value("iceDamagePercent", tuning.IceDamagePercent), 0, 1000);
+            tuning.FireDamagePercent = std::clamp(traps.value("fireDamagePercent", tuning.FireDamagePercent), 0, 1000);
             tuning.FireDuration = std::clamp(traps.value("fireDuration", tuning.FireDuration), 0, 600);
-            tuning.ShockDamage = std::clamp(traps.value("shockDamage", tuning.ShockDamage), 0, 320);
+            tuning.ShockDamagePercent = std::clamp(traps.value("shockDamagePercent", tuning.ShockDamagePercent), 0, 1000);
             tuning.ShockDuration = std::clamp(traps.value("shockDuration", tuning.ShockDuration), 1, 200);
             uint32_t total = 0;
             if (traps.contains("knockback") && traps["knockback"].is_array()) {
                 for (const auto& row : traps["knockback"]) {
                     if (!row.is_object() || !row.contains("percent") || !row["percent"].is_number_unsigned() ||
-                        !row.contains("distance") || !row["distance"].is_number()) {
+                        !row.contains("minDistance") || !row["minDistance"].is_number() ||
+                        !row.contains("maxDistance") || !row["maxDistance"].is_number()) {
                         continue;
                     }
                     const uint32_t percent = row["percent"].get<uint32_t>();
-                    const float distance = row["distance"].get<float>();
-                    if (percent == 0 || total + percent > 100 || distance < 0.0f || distance > 2000.0f) {
+                    const float minDistance = row["minDistance"].get<float>();
+                    const float maxDistance = row["maxDistance"].get<float>();
+                    if (percent == 0 || total + percent > 100 || minDistance < 0.0f || maxDistance > 2000.0f ||
+                        maxDistance < minDistance) {
                         continue;
                     }
                     total += percent;
-                    tuning.Knockback.push_back({ percent, distance });
+                    tuning.Knockback.push_back({ percent, minDistance, maxDistance });
                 }
             }
             settings.Traps = std::move(tuning);
