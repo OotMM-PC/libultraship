@@ -13,6 +13,7 @@ struct OotmmPlayerPose {
     std::string Game = "oot";
     int SceneId = -1;
     int RoomId = 0;
+    int Place = 0;
     float Pos[3] = { 0.0f, 0.0f, 0.0f };
     int16_t Yaw = 0;
     float YOffset = 0.0f;

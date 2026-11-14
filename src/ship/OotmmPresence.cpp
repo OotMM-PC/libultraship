@@ -41,6 +41,7 @@ std::optional<OotmmPlayerPose> ParsePoseObject(const nlohmann::json& root) {
     }
     pose.SceneId = ReadInt(root, "sceneId", -1);
     pose.RoomId = ReadInt(root, "roomId", 0);
+    pose.Place = ReadInt(root, "place", 0);
     if (const auto pos = root.find("pos"); pos != root.end() && pos->is_array() && pos->size() >= 3) {
         for (int i = 0; i < 3; ++i) {
             pose.Pos[i] = (*pos)[i].is_number() ? (*pos)[i].get<float>() : 0.0f;
@@ -90,6 +91,7 @@ std::string OotmmPresenceIo::SerializePose(const OotmmPlayerPose& pose) {
     out << ",\"game\":" << Escape(pose.Game);
     out << ",\"sceneId\":" << pose.SceneId;
     out << ",\"roomId\":" << pose.RoomId;
+    if (pose.Place != 0) out << ",\"place\":" << pose.Place;
     out << ",\"pos\":[" << pose.Pos[0] << "," << pose.Pos[1] << "," << pose.Pos[2] << "]";
     out << ",\"yaw\":" << pose.Yaw;
     out << ",\"yOff\":" << pose.YOffset;
