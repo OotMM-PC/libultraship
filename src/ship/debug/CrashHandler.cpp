@@ -299,13 +299,36 @@ void CrashHandler::PrintRegisters(CONTEXT* ctx) {
 #endif
 }
 
+static void FormatModuleAddress(char* out, size_t size, DWORD64 address) {
+    HMODULE module = nullptr;
+    char path[MAX_PATH];
+    if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                           reinterpret_cast<LPCSTR>(address), &module) &&
+        module != nullptr && GetModuleFileNameA(module, path, sizeof(path)) != 0) {
+        const char* name = strrchr(path, '\\');
+        sprintf_s(out, size, "0x%016llX %s+0x%llX", address, name != nullptr ? name + 1 : path,
+                  address - reinterpret_cast<DWORD64>(module));
+    } else {
+        sprintf_s(out, size, "0x%016llX ???", address);
+    }
+}
+
+static bool ReadStackQword(DWORD64 address, DWORD64* value) {
+    MEMORY_BASIC_INFORMATION info;
+    if (VirtualQuery(reinterpret_cast<LPCVOID>(address), &info, sizeof(info)) == 0 || info.State != MEM_COMMIT ||
+        (info.Protect & (PAGE_NOACCESS | PAGE_GUARD)) != 0) {
+        return false;
+    }
+    memcpy(value, reinterpret_cast<const void*>(address), sizeof(*value));
+    return true;
+}
+
 void CrashHandler::PrintStack(CONTEXT* ctx) {
 // Some crash hander features are not supported on ARM64
 #ifndef _M_ARM64
     BOOL result;
     HANDLE process;
     HANDLE thread;
-    HMODULE hModule;
     ULONG frame;
     DWORD64 displacement;
     DWORD disp;
@@ -325,7 +348,6 @@ void CrashHandler::PrintStack(CONTEXT* ctx) {
 #endif
 
     char buffer[sizeof(SYMBOL_INFO) + MAX_SYM_NAME + sizeof(TCHAR)];
-    char module[512];
 
     PSYMBOL_INFO symbol = (PSYMBOL_INFO)buffer;
 
@@ -333,6 +355,19 @@ void CrashHandler::PrintStack(CONTEXT* ctx) {
     memcpy(&ctx2, ctx, sizeof(CONTEXT));
 
     PrintRegisters(&ctx2);
+
+#if defined(_M_AMD64)
+    {
+        char where[MAX_PATH + 64];
+        FormatModuleAddress(where, sizeof(where), ctx2.Rip);
+        WRITE_VAR_LINE_M("Fault: ", where);
+        DWORD64 returnAddress = 0;
+        if (ReadStackQword(ctx2.Rsp, &returnAddress)) {
+            FormatModuleAddress(where, sizeof(where), returnAddress);
+            WRITE_VAR_LINE_M("Stack top: ", where);
+        }
+    }
+#endif
 
     process = GetCurrentProcess();
     thread = GetCurrentThread();
@@ -358,7 +393,9 @@ void CrashHandler::PrintStack(CONTEXT* ctx) {
         }
         symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
         symbol->MaxNameLen = MAX_SYM_NAME;
-        SymFromAddr(process, (ULONG64)stack.AddrPC.Offset, &displacement, symbol);
+        if (!SymFromAddr(process, (ULONG64)stack.AddrPC.Offset, &displacement, symbol)) {
+            symbol->Name[0] = '\0';
+        }
 #if defined(_M_AMD64)
         IMAGEHLP_LINE64 line;
         line.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
@@ -375,21 +412,14 @@ void CrashHandler::PrintStack(CONTEXT* ctx) {
             sprintf_s(lineNumberStr, sizeof(lineNumberStr), " Line: %d", line.LineNumber);
             AppendLine(lineNumberStr);
         } else {
-            WRITE_VAR_M("    ", symbol->Name);
-            char addrString[20];
-            sprintf_s(addrString, std::size(addrString), "0x%016llX", symbol->Address);
-            WRITE_VAR_M("(", addrString);
-            AppendStr(")");
-            hModule = nullptr;
-            GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                              (LPCTSTR)(stack.AddrPC.Offset), &hModule);
-
-            if (hModule != nullptr) {
-                GetModuleFileNameA(hModule, module, sizeof(module));
-                WRITE_VAR_LINE_M(" in ", module);
-            } else {
-                WRITE_VAR_LINE_M(" in ", "???");
+            char where[MAX_PATH + 64];
+            FormatModuleAddress(where, sizeof(where), stack.AddrPC.Offset);
+            AppendStr("    ");
+            if (symbol->Name[0] != '\0') {
+                AppendStr(symbol->Name);
+                AppendStr(" ");
             }
+            AppendLine(where);
         }
     }
     PrintCommon();
