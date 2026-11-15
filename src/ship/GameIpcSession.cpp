@@ -58,6 +58,7 @@ void GameIpcSession::Stop() {
     mWelcomed = false;
     mCheckRewardSupported = false;
     mTransitionAccepted = false;
+    mSaveRequest.reset();
     mRemoteRoster.clear();
     mRemoteHits.clear();
     mRemoteRosterFresh = false;
@@ -235,6 +236,18 @@ bool GameIpcSession::ConsumeTransitionAccepted() {
     return accepted;
 }
 
+std::optional<uint64_t> GameIpcSession::ConsumeSaveRequest() {
+    const auto request = mSaveRequest;
+    mSaveRequest.reset();
+    return request;
+}
+
+bool GameIpcSession::SendSaveCompleted(uint64_t requestId, bool saved) {
+    return Send(nlohmann::json{
+        { "type", GameIpcMessageType::SaveCompleted }, { "requestId", requestId }, { "saved", saved } }
+                    .dump());
+}
+
 bool GameIpcSession::Send(std::string message) {
     return mWelcomed && mClient.Send(std::move(message));
 }
@@ -348,6 +361,13 @@ void GameIpcSession::HandleMessage(const std::string& message, GameIpcSettings& 
 
     if (type == GameIpcMessageType::TransitionAccepted) {
         mTransitionAccepted = mWelcomed;
+        return;
+    }
+
+    if (type == GameIpcMessageType::SaveRequest) {
+        if (mWelcomed && root.contains("requestId") && root["requestId"].is_number_unsigned()) {
+            mSaveRequest = root["requestId"].get<uint64_t>();
+        }
         return;
     }
 

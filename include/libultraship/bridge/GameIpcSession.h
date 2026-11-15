@@ -39,6 +39,8 @@ inline constexpr const char* ModelReady = "modelReady";
 inline constexpr const char* ModelMounted = "modelMounted";
 inline constexpr const char* CrossGameTransition = "crossGameTransition";
 inline constexpr const char* TransitionAccepted = "transitionAccepted";
+inline constexpr const char* SaveRequest = "saveRequest";
+inline constexpr const char* SaveCompleted = "saveCompleted";
 } // namespace GameIpcMessageType
 
 struct GameIpcKnockbackChance {
@@ -107,6 +109,8 @@ class GameIpcSession {
     bool RequestCrossGameTransition(std::string fromGame, std::string toGame, std::string toEntrance,
                                     std::optional<uint32_t> toNativeId, std::optional<uint32_t> ootAge);
     bool ConsumeTransitionAccepted();
+    std::optional<uint64_t> ConsumeSaveRequest();
+    bool SendSaveCompleted(uint64_t requestId, bool saved);
 
     bool SendCheckCollected(const std::string& game, const std::string& checkId, bool present = false);
     bool IsCheckPresentationPending(const std::string& key) const;
@@ -143,6 +147,7 @@ class GameIpcSession {
     bool mWelcomed = false;
     bool mCheckRewardSupported = false;
     bool mTransitionAccepted = false;
+    std::optional<uint64_t> mSaveRequest;
 
     std::string mRemoteRoster;
     bool mRemoteRosterFresh = false;
