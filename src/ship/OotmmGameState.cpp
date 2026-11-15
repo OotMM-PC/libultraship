@@ -1,7 +1,9 @@
 #include "libultraship/bridge/OotmmGameState.h"
+#include "ship/debug/CrashMonitor.h"
 
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
 #include <cstdlib>
 #include <fstream>
 #include <limits>
@@ -191,6 +193,12 @@ bool OotmmGameState::LoadFromFile(const std::string& path) {
     if (!mBoot.SeedPath.empty() && !LoadSeed()) {
         return false;
     }
+
+    char note[320];
+    snprintf(note, sizeof(note), "seed %s, player %u, save %s, boots %s at entrance 0x%X, slot %d", mSeedId.c_str(),
+             mPlayerId, mBoot.SaveId.c_str(), mBoot.BootGame == OotmmGame::Oot ? "OoT" : "MM",
+             mBoot.BootEntrance.value_or(0), mBoot.LogicalSlot.has_value() ? static_cast<int>(*mBoot.LogicalSlot) : -1);
+    Ship::CrashMonitor::SetNote("session", note);
 
     mActive = true;
     return true;

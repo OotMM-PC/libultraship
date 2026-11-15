@@ -1,8 +1,13 @@
+#include <atomic>
 #include <csignal>
+#include <cstdint>
 #include <cstdlib>
+#include <exception>
+#include <typeinfo>
 #include <spdlog/spdlog.h>
 #include "ship/utils/StringHelper.h"
 #include "ship/debug/CrashHandler.h"
+#include "ship/debug/CrashMonitor.h"
 #include "ship/Context.h"
 #include "ship/window/WindowEmbedding.h"
 
@@ -428,10 +433,14 @@ void CrashHandler::PrintStack(CONTEXT* ctx) {
 #endif
 }
 
+static std::atomic<CrashHandlerCallback> sGameInfoCallback{ nullptr };
+
 extern "C" LONG WINAPI seh_filter(PEXCEPTION_POINTERS ex) {
     if (IsWindowEmbedded() && !IsExternalWindowParentAlive()) {
         return EXCEPTION_EXECUTE_HANDLER;
     }
+
+    CrashMonitor::Report(ex, "Unhandled exception", nullptr, sGameInfoCallback.load());
 
     char exceptionString[20];
     std::shared_ptr<CrashHandler> crashHandler = Context::GetInstance()->GetCrashHandler();
@@ -449,7 +458,61 @@ extern "C" LONG WINAPI seh_filter(PEXCEPTION_POINTERS ex) {
     return EXCEPTION_EXECUTE_HANDLER;
 }
 
+static LONG WINAPI HeapCorruptionFilter(PEXCEPTION_POINTERS ex) {
+    if (ex->ExceptionRecord->ExceptionCode == 0xC0000374) {
+        CrashMonitor::Report(ex, "Heap corruption",
+                             "The heap was damaged earlier; this stack is where Windows noticed it.",
+                             sGameInfoCallback.load());
+    }
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static bool DescribeCurrentException(char* detail, size_t size) {
+    const std::exception_ptr current = std::current_exception();
+    if (!current) {
+        return false;
+    }
+    try {
+        std::rethrow_exception(current);
+    } catch (const std::exception& exception) {
+        snprintf(detail, size, "%s: %s", typeid(exception).name(), exception.what());
+    } catch (...) {
+        snprintf(detail, size, "exception of a type outside std::exception");
+    }
+    return true;
+}
+
+static void TerminateHandler() {
+    char detail[400] = "";
+    DescribeCurrentException(detail, sizeof(detail));
+    CrashMonitor::ReportHere(CrashMonitor::kCppExceptionCode, "Unhandled C++ exception", detail,
+                             sGameInfoCallback.load());
+    abort();
+}
+
+static void PureCallHandler() {
+    CrashMonitor::ReportHere(CrashMonitor::kPureCallCode, "Pure virtual call", nullptr, sGameInfoCallback.load());
+    abort();
+}
+
+static void InvalidParameterHandler(const wchar_t* expression, const wchar_t* function, const wchar_t*, unsigned int,
+                                    uintptr_t) {
+    char detail[400] = "";
+    if (function != nullptr) {
+        snprintf(detail, sizeof(detail), "%ls: %ls", function, expression != nullptr ? expression : L"");
+    }
+    CrashMonitor::ReportHere(CrashMonitor::kInvalidParameterCode, "Invalid C runtime parameter", detail,
+                             sGameInfoCallback.load());
+    abort();
+}
+
 static void abort_handler(int) {
+    char detail[400] = "";
+    if (DescribeCurrentException(detail, sizeof(detail))) {
+        CrashMonitor::ReportHere(CrashMonitor::kCppExceptionCode, "Unhandled C++ exception", detail,
+                                 sGameInfoCallback.load());
+    }
+    CrashMonitor::ReportHere(CrashMonitor::kAbortCode, "abort()", nullptr, sGameInfoCallback.load());
     CONTEXT ctx;
     RtlCaptureContext(&ctx);
     std::shared_ptr<CrashHandler> crashHandler = Context::GetInstance()->GetCrashHandler();
@@ -481,7 +544,11 @@ CrashHandler::CrashHandler() {
     sigaction(SIGKILL, &shutdownAction, nullptr);
 #elif defined(_WIN32)
     SetUnhandledExceptionFilter(seh_filter);
+    AddVectoredExceptionHandler(1, HeapCorruptionFilter);
     signal(SIGABRT, abort_handler);
+    std::set_terminate(TerminateHandler);
+    _set_purecall_handler(PureCallHandler);
+    _set_invalid_parameter_handler(InvalidParameterHandler);
     if (std::getenv("OOTMM_RUNTIME_TEST_DIR") != nullptr) {
         _set_error_mode(_OUT_TO_STDERR);
         _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
@@ -489,9 +556,8 @@ CrashHandler::CrashHandler() {
 #endif
 }
 
-CrashHandler::CrashHandler(CrashHandlerCallback callback) {
-    mCallback = callback;
-    CrashHandler();
+CrashHandler::CrashHandler(CrashHandlerCallback callback) : CrashHandler() {
+    RegisterCallback(callback);
 }
 
 CrashHandler::~CrashHandler() {
@@ -501,5 +567,8 @@ CrashHandler::~CrashHandler() {
 
 void CrashHandler::RegisterCallback(CrashHandlerCallback callback) {
     mCallback = callback;
+#ifdef _WIN32
+    sGameInfoCallback.store(callback);
+#endif
 }
 } // namespace Ship

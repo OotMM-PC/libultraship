@@ -1,6 +1,7 @@
 #include "fast/Fast3dWindow.h"
 
 #include "ship/Context.h"
+#include "ship/debug/CrashMonitor.h"
 #include "ship/config/Config.h"
 #include "ship/controller/controldeck/ControlDeck.h"
 #include "ship/config/ConsoleVariable.h"
@@ -219,6 +220,7 @@ bool Fast3dWindow::DrawAndRunGraphicsCommands(Gfx* commands, const std::unordere
 }
 
 void Fast3dWindow::HandleEvents() {
+    Ship::CrashMonitor::SelfTestTick();
     if (!Ship::IsExternalWindowParentAlive()) {
         Close();
         return;

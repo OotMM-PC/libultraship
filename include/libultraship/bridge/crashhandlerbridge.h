@@ -9,6 +9,8 @@ extern "C" {
 #endif
 
 void CrashHandlerRegisterCallback(CrashHandlerCallback callback);
+void CrashHandlerSetNote(const char* key, const char* value);
+int CrashMonitorRunIfRequested(int argc, char** argv, int* exitCode);
 
 #ifdef __cplusplus
 }

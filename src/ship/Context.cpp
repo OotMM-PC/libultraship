@@ -8,6 +8,8 @@
 #include "ship/config/ConsoleVariable.h"
 #include "ship/controller/controldeck/ControlDeck.h"
 #include "ship/debug/CrashHandler.h"
+#include "ship/debug/CrashLogSink.h"
+#include "ship/debug/CrashMonitor.h"
 #include "ship/window/FileDropMgr.h"
 #include "ship/window/WindowEmbedding.h"
 
@@ -155,6 +157,7 @@ bool Context::InitLogging(spdlog::level::level_enum debugBuildLogLevel,
         auto logPath = GetPathRelativeToAppDirectory(("logs/" + GetName() + ".log"));
         auto fileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(logPath, 1024 * 1024 * 10, 10);
         sinks.push_back(fileSink);
+        sinks.push_back(std::make_shared<CrashLogSink>());
 #ifdef _DEBUG
         mLogger = std::make_shared<spdlog::logger>("multi_sink", sinks.begin(), sinks.end());
         GetLogger()->set_level(debugBuildLogLevel);
@@ -266,6 +269,10 @@ bool Context::InitCrashHandler() {
     if (GetCrashHandler() == nullptr) {
         SPDLOG_ERROR("Failed to initialize crash handler");
         return false;
+    }
+
+    if (!CrashMonitor::Start(GetName(), GetShortName(), GetPathRelativeToAppDirectory("crashes"))) {
+        SPDLOG_WARN("Crash monitor is unavailable; crashes will only be logged");
     }
 
     return true;
