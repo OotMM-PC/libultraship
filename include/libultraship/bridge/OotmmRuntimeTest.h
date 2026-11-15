@@ -17,6 +17,7 @@ class OotmmRuntimeTest {
         uint16_t Buttons = 0;
         int8_t X = 0;
         int8_t Y = 0;
+        int8_t RightY = 0;
     };
 
     struct Warp {
@@ -134,6 +135,7 @@ class OotmmRuntimeTest {
             const auto buttons = Integer(command, "buttons", 0, 65535);
             const auto x = Integer(command, "stickX", -80, 80);
             const auto y = Integer(command, "stickY", -80, 80);
+            const auto rightY = command.contains("rightStickY") ? Integer(command, "rightStickY", -80, 80) : 0;
             std::optional<Warp> warp;
             if (const auto field = command.find("warp"); field != command.end()) {
                 if (!field->is_array() || field->size() != 4 || !(*field)[0].is_number() ||
@@ -150,7 +152,7 @@ class OotmmRuntimeTest {
             const bool hold = command.contains("hold") && command.at("hold").is_boolean() && command.at("hold").get<bool>();
             mSequence = sequence;
             mRemaining = frames;
-            mPad = { uint16_t(buttons), int8_t(x), int8_t(y) };
+            mPad = { uint16_t(buttons), int8_t(x), int8_t(y), int8_t(rightY) };
             mWarp = warp;
             mRoom = room;
             mHold = hold;
