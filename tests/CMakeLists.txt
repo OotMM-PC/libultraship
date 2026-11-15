@@ -34,6 +34,11 @@ if(WIN32)
         "${CMAKE_CURRENT_BINARY_DIR}/ipc-evidence/$<CONFIG>")
 endif()
 
+add_executable(OotmmDialogTests OotmmDialogTests.cpp ../src/ship/OotmmDialog.cpp)
+target_compile_features(OotmmDialogTests PRIVATE cxx_std_20)
+target_include_directories(OotmmDialogTests PRIVATE ../include)
+add_test(NAME OotmmDialogTests COMMAND OotmmDialogTests)
+
 add_executable(OotmmSaveRecoveryTests OotmmSaveRecoveryTests.cpp ../src/ship/utils/AtomicFile.cpp)
 target_compile_features(OotmmSaveRecoveryTests PRIVATE cxx_std_20)
 target_include_directories(OotmmSaveRecoveryTests PRIVATE ../include)
