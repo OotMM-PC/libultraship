@@ -24,21 +24,47 @@ const std::unordered_map<std::string, OotmmCsmcClass>& TypeTable() {
     return sTable;
 }
 
+const std::string& Substitute(const std::string& itemId) {
+    static const std::unordered_map<std::string, std::string> sSubstitutions = {
+        { "OOT_SWORD", "OOT_SWORD_KOKIRI" },
+        { "OOT_SWORD_GORON", "OOT_SWORD_KNIFE" },
+        { "OOT_OCARINA", "OOT_OCARINA_FAIRY" },
+        { "OOT_STRENGTH", "OOT_GORON_BRACELET" },
+        { "OOT_SCALE", "OOT_SCALE_BRONZE" },
+        { "OOT_SHIELD", "OOT_PROGRESSIVE_SHIELD_DEKU" },
+        { "OOT_SEEDS_5", "OOT_DEKU_SEEDS_5" },
+        { "OOT_SEEDS_30", "OOT_DEKU_SEEDS_30" },
+        { "MM_SWORD", "MM_SWORD_KOKIRI" },
+        { "MM_SHIELD", "MM_PROGRESSIVE_SHIELD_DEKU" },
+        { "MM_OCARINA", "MM_OCARINA_OF_TIME" },
+        { "MM_SCALE", "MM_SCALE_BRONZE" },
+        { "MM_STRENGTH", "MM_GORON_BRACELET" },
+        { "MM_CLOCK", "MM_CLOCK1" },
+        { "MM_SEEDS_5", "MM_DEKU_SEEDS_5" },
+        { "MM_SEEDS_30", "MM_DEKU_SEEDS_30" },
+        { "MM_MASK_GERUDO", "OOT_MASK_GERUDO" },
+        { "MM_MASK_SKULL", "OOT_MASK_SKULL" },
+        { "MM_MASK_SPOOKY", "OOT_MASK_SPOOKY" },
+    };
+    const auto entry = sSubstitutions.find(itemId);
+    return entry == sSubstitutions.end() ? itemId : entry->second;
+}
+
 OotmmCsmcClass LookupItem(OotmmGame game, const std::string& itemId) {
     const auto& table = TypeTable();
     if (itemId.rfind("SHARED_", 0) == 0) {
         const std::string suffix = itemId.substr(7);
         const char* self = game == OotmmGame::Oot ? "OOT_" : "MM_";
         const char* other = game == OotmmGame::Oot ? "MM_" : "OOT_";
-        if (const auto entry = table.find(self + suffix); entry != table.end()) {
+        if (const auto entry = table.find(Substitute(self + suffix)); entry != table.end()) {
             return entry->second;
         }
-        if (const auto entry = table.find(other + suffix); entry != table.end()) {
+        if (const auto entry = table.find(Substitute(other + suffix)); entry != table.end()) {
             return entry->second;
         }
         return OotmmCsmcClass::Normal;
     }
-    const auto entry = table.find(itemId);
+    const auto entry = table.find(Substitute(itemId));
     return entry == table.end() ? OotmmCsmcClass::Normal : entry->second;
 }
 
