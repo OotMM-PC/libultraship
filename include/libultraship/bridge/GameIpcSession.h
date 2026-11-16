@@ -82,6 +82,7 @@ struct GameIpcSettings {
     int ZTargetHold = -1;
     bool FairySpotPads = false;
     bool PotRolling = true;
+    int PvpDamagePercent = 100;
     GameIpcTrapTuning Traps;
 };
 

@@ -39,7 +39,20 @@ struct OotmmPlayerPose {
     int CustomLeftHand = 0;
     int CustomRightHand = 0;
     int CustomBoots = 0;
+    bool Guard = false;
     std::vector<int16_t> JointTable;
+};
+
+enum OotmmPvpKind {
+    OOTMM_PVP_FLINCH = 0,
+    OOTMM_PVP_STAGGER = 1,
+    OOTMM_PVP_KNOCKDOWN = 2,
+    OOTMM_PVP_BLAST = 3,
+    OOTMM_PVP_FIRE = 4,
+    OOTMM_PVP_ICE = 5,
+    OOTMM_PVP_SHOCK = 6,
+    OOTMM_PVP_BLOCKED = 7,
+    OOTMM_PVP_STUN = 8,
 };
 
 struct OotmmPvpHit {
@@ -48,6 +61,7 @@ struct OotmmPvpHit {
     int Damage = 0;
     int16_t Yaw = 0;
     uint32_t Seq = 0;
+    int Kind = OOTMM_PVP_KNOCKDOWN;
 };
 
 class OotmmPresenceIo {

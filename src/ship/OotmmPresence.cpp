@@ -50,6 +50,7 @@ std::optional<OotmmPlayerPose> ParsePoseObject(const nlohmann::json& root) {
     pose.Yaw = static_cast<int16_t>(ReadInt(root, "yaw", 0));
     pose.YOffset = static_cast<float>(ReadNumber(root, "yOff", 0.0));
     pose.MoveFlags = ReadInt(root, "mvf", 0);
+    pose.Guard = ReadInt(root, "grd", 0) != 0;
     pose.Form = ReadInt(root, "form", 0);
     pose.HumanModel = ReadInt(root, "hm", 0);
     pose.Seq = static_cast<uint32_t>(ReadNumber(root, "seq", 0));
@@ -96,6 +97,7 @@ std::string OotmmPresenceIo::SerializePose(const OotmmPlayerPose& pose) {
     out << ",\"yaw\":" << pose.Yaw;
     out << ",\"yOff\":" << pose.YOffset;
     out << ",\"mvf\":" << pose.MoveFlags;
+    if (pose.Guard) out << ",\"grd\":1";
     out << ",\"form\":" << pose.Form;
     if (pose.HumanModel != 0) out << ",\"hm\":" << pose.HumanModel;
     out << ",\"seq\":" << pose.Seq;
@@ -135,6 +137,7 @@ std::string OotmmPresenceIo::SerializePvpHit(const OotmmPvpHit& hit) {
     out << ",\"damage\":" << hit.Damage;
     out << ",\"yaw\":" << hit.Yaw;
     out << ",\"seq\":" << hit.Seq;
+    out << ",\"kind\":" << hit.Kind;
     out << "}";
     return out.str();
 }
@@ -172,6 +175,7 @@ std::optional<OotmmPvpHit> OotmmPresenceIo::ParsePvpHit(const std::string& json)
     hit.Damage = ReadInt(root, "damage", 0);
     hit.Yaw = static_cast<int16_t>(ReadInt(root, "yaw", 0));
     hit.Seq = static_cast<uint32_t>(ReadNumber(root, "seq", 0));
+    hit.Kind = ReadInt(root, "kind", OOTMM_PVP_KNOCKDOWN);
     return hit;
 }
 
