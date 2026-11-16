@@ -392,6 +392,12 @@ void GameIpcSession::HandleMessage(const std::string& message, GameIpcSettings& 
         if (values.contains("zTargetHold") && values["zTargetHold"].is_boolean()) {
             settings.ZTargetHold = values["zTargetHold"].get<bool>() ? 1 : 0;
         }
+        if (values.contains("fairySpotPads") && values["fairySpotPads"].is_boolean()) {
+            settings.FairySpotPads = values["fairySpotPads"].get<bool>();
+        }
+        if (values.contains("potRolling") && values["potRolling"].is_boolean()) {
+            settings.PotRolling = values["potRolling"].get<bool>();
+        }
         if (values.contains("traps") && values["traps"].is_object()) {
             const auto& traps = values["traps"];
             GameIpcTrapTuning tuning;

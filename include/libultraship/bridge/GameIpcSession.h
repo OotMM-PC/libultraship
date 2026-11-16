@@ -80,6 +80,8 @@ struct GameIpcSettings {
     std::string TransportState = "healthy";
     uint32_t PendingChecks = 0;
     int ZTargetHold = -1;
+    bool FairySpotPads = false;
+    bool PotRolling = true;
     GameIpcTrapTuning Traps;
 };
 
