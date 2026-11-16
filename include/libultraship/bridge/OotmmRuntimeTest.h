@@ -1,6 +1,9 @@
 #pragma once
 
 #if !defined(NDEBUG) || defined(OOTMM_RUNTIME_TEST)
+#include <algorithm>
+#include <atomic>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
@@ -74,7 +77,32 @@ class OotmmRuntimeTest {
         return room;
     }
 
+    void HearAudio(const int16_t* samples, size_t count) {
+        if (!Enabled() || count == 0) {
+            return;
+        }
+        uint32_t peak = 0;
+        uint64_t squares = 0;
+        for (size_t i = 0; i < count; i++) {
+            const int32_t sample = samples[i];
+            peak = std::max(peak, static_cast<uint32_t>(std::abs(sample)));
+            squares += static_cast<uint64_t>(sample * sample);
+        }
+        uint32_t known = mAudioPeak.load();
+        while (peak > known && !mAudioPeak.compare_exchange_weak(known, peak)) {
+        }
+        mAudioSquares += squares;
+        mAudioSamples += count;
+        if (mAudioDump.is_open()) {
+            mAudioDump.write(reinterpret_cast<const char*>(samples), count * sizeof(int16_t));
+        }
+    }
+
     void Observe(nlohmann::json state) {
+        const uint64_t samples = mAudioSamples.exchange(0);
+        const uint64_t squares = mAudioSquares.exchange(0);
+        state["audioPeak"] = mAudioPeak.exchange(0);
+        state["audioRms"] = samples == 0 ? 0 : static_cast<uint32_t>(std::sqrt(double(squares) / double(samples)));
         state["protocol"] = "ootmm.runtime-test.v1";
         state["frame"] = mFrame;
         state["sequence"] = mSequence;
@@ -96,6 +124,9 @@ class OotmmRuntimeTest {
             return;
         }
         mTrace.open(mDirectory / "observations.jsonl", std::ios::out | std::ios::trunc);
+        if (const char* dump = std::getenv("OOTMM_RUNTIME_AUDIO_DUMP"); dump != nullptr && dump[0] == '1') {
+            mAudioDump.open(mDirectory / "audio.pcm", std::ios::out | std::ios::trunc | std::ios::binary);
+        }
     }
 
     static int64_t Integer(const nlohmann::json& value, const char* key, int64_t min, int64_t max) {
@@ -170,6 +201,10 @@ class OotmmRuntimeTest {
     std::filesystem::path mDirectory;
     std::filesystem::file_time_type mStamp{};
     std::ofstream mTrace;
+    std::ofstream mAudioDump;
+    std::atomic<uint32_t> mAudioPeak{ 0 };
+    std::atomic<uint64_t> mAudioSquares{ 0 };
+    std::atomic<uint64_t> mAudioSamples{ 0 };
     uint64_t mFrame = 0;
     uint64_t mLastObservedFrame = 0;
     int64_t mLastFinishedSequence = 0;
