@@ -1,6 +1,11 @@
 #include "libultraship/bridge/OotmmItemRender.h"
 
+#include "fast/resource/type/DisplayList.h"
+#include "ship/Context.h"
+#include "ship/resource/ResourceManager.h"
+
 #include <algorithm>
+#include <memory>
 #include <unordered_map>
 
 namespace Ship {
@@ -130,7 +135,7 @@ const OotmmRenderRecipe kLongshotRecipe = {
 };
 
 const OotmmRenderRecipe kLargeMagicRecipe = {
-    OotmmModelGame::Oot, OotmmRenderKind::OPA0, 0,
+    OotmmModelGame::Oot, OotmmRenderKind::MAGIC_UPGRADE, 0,
     { "objects/object_gi_magicpot/gGiMagicJarLargeDL" },
 };
 
@@ -271,6 +276,46 @@ std::string WithPrefix(std::string_view prefix, std::string_view suffix) {
     return result;
 }
 
+struct MagicUpgradeJar {
+    std::shared_ptr<Fast::DisplayList> Source;
+    std::vector<Gfx> Recolored;
+};
+
+void SwapMagicJarColors(std::vector<Gfx>& jar) {
+    constexpr uint32_t kSetPrimColor = 0xFA;
+    constexpr uint32_t kSetEnvColor = 0xFB;
+    constexpr uint32_t kBody[2] = { 0x286428FF, 0x001E14FF };
+    constexpr uint32_t kTrims[2][2] = { { 0xFFFFFFFF, 0x323C3CFF }, { 0xFFFF96FF, 0x644600FF } };
+
+    const auto slotOf = [](const Gfx& command) {
+        const uint32_t opcode = static_cast<uint32_t>(command.words.w0 >> 24) & 0xFF;
+        return opcode == kSetPrimColor ? 0 : opcode == kSetEnvColor ? 1 : -1;
+    };
+    const uint32_t* trim = nullptr;
+    for (const Gfx& command : jar) {
+        const uint32_t color = static_cast<uint32_t>(command.words.w1);
+        if (slotOf(command) == 0 && (color == kTrims[0][0] || color == kTrims[1][0])) {
+            trim = color == kTrims[0][0] ? kTrims[0] : kTrims[1];
+            break;
+        }
+    }
+    if (trim == nullptr) {
+        return;
+    }
+    for (Gfx& command : jar) {
+        const int slot = slotOf(command);
+        if (slot < 0) {
+            continue;
+        }
+        const uint32_t color = static_cast<uint32_t>(command.words.w1);
+        if (color == kBody[slot]) {
+            command.words.w1 = trim[slot];
+        } else if (color == trim[slot]) {
+            command.words.w1 = kBody[slot];
+        }
+    }
+}
+
 } // namespace
 
 std::string OotmmItemRenderCatalog::CanonicalId(std::string_view itemId) {
@@ -395,6 +440,22 @@ const std::vector<OotmmDebugPresentationItem>& OotmmItemRenderCatalog::DebugOnly
         { "OOT_TRAP_RUPOOR", "Rupoor Trap", "oot" },
     };
     return kItems;
+}
+
+Gfx* OotmmMagicUpgradeJar(const std::string& path) {
+    static std::unordered_map<std::string, MagicUpgradeJar> sJars;
+    const auto source = std::dynamic_pointer_cast<Fast::DisplayList>(
+        Context::GetInstance()->GetResourceManager()->LoadResource(path));
+    if (source == nullptr || source->Instructions.empty()) {
+        return nullptr;
+    }
+    MagicUpgradeJar& jar = sJars[path];
+    if (jar.Source != source) {
+        jar.Source = source;
+        jar.Recolored = source->Instructions;
+        SwapMagicJarColors(jar.Recolored);
+    }
+    return jar.Recolored.data();
 }
 
 } // namespace Ship

@@ -7,6 +7,8 @@
 #include <string_view>
 #include <vector>
 
+union Gfx;
+
 namespace Ship {
 
 enum class OotmmModelGame {
@@ -61,6 +63,7 @@ enum class OotmmRenderKind {
     STRAY_FAIRY,
     TRAP,
     POND_FISH,
+    MAGIC_UPGRADE,
 };
 
 struct OotmmRenderRecipe {
@@ -85,5 +88,9 @@ class OotmmItemRenderCatalog {
     static const std::vector<OotmmDebugPresentationItem>& DebugOnlyItems();
     static std::vector<std::string_view> AllIds();
 };
+
+/// The magic jar model at `path` with its body and trim colours exchanged, the look og gives the magic upgrades.
+/// Null when the model is missing.
+Gfx* OotmmMagicUpgradeJar(const std::string& path);
 
 } // namespace Ship
