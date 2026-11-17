@@ -10,6 +10,7 @@
 #include <optional>
 #include <string>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 namespace Ship {
@@ -41,6 +42,9 @@ inline constexpr const char* CrossGameTransition = "crossGameTransition";
 inline constexpr const char* TransitionAccepted = "transitionAccepted";
 inline constexpr const char* SaveRequest = "saveRequest";
 inline constexpr const char* SaveCompleted = "saveCompleted";
+inline constexpr const char* EntranceTaken = "entranceTaken";
+inline constexpr const char* EntranceAccepted = "entranceAccepted";
+inline constexpr const char* Location = "location";
 } // namespace GameIpcMessageType
 
 struct GameIpcKnockbackChance {
@@ -121,6 +125,9 @@ class GameIpcSession {
     bool IsCheckCompleted(const std::string& game, const std::string& checkId) const;
     uint64_t CompletedChecksRevision() const;
 
+    bool SendEntranceTaken(uint32_t source);
+    bool SendLocation(int scene, uint32_t entrance);
+
     bool PresenceActive() const;
     bool SendPlayerPose(const OotmmPlayerPose& pose);
     bool SendPvpHit(const OotmmPvpHit& hit);
@@ -134,6 +141,8 @@ class GameIpcSession {
   private:
     void SendHello();
     bool SendCheckReport(const std::string& key);
+    bool SendEntranceReport(uint64_t serial, uint32_t source);
+    bool SendLocationReport();
     void HandleMessage(const std::string& message, GameIpcSettings& settings, OotmmInventory* inventory,
                        bool& settingsChanged);
 
@@ -160,6 +169,9 @@ class GameIpcSession {
     std::unordered_set<std::string> mCompletedChecks;
     std::vector<std::string> mPendingCheckReports;
     uint64_t mCompletedRevision = 0;
+    std::vector<std::pair<uint64_t, uint32_t>> mPendingEntrances;
+    uint64_t mEntranceSerial = 0;
+    std::optional<std::pair<int, uint32_t>> mLocation;
 };
 
 } // namespace Ship

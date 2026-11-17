@@ -18,6 +18,7 @@ constexpr int ProtocolMajor = 1;
 constexpr int ProtocolMinor = 0;
 constexpr size_t MaxUnhandledMessages = 1024;
 constexpr size_t MaxQueuedHits = 64;
+constexpr size_t MaxPendingEntrances = 256;
 constexpr char kRosterPrefix[] = "{\"type\":\"remotePlayerPoses\"";
 
 uint32_t ProcessId() {
@@ -67,6 +68,9 @@ void GameIpcSession::Stop() {
     mCompletedChecks.clear();
     mPendingCheckReports.clear();
     mCompletedRevision = 0;
+    mPendingEntrances.clear();
+    mEntranceSerial = 0;
+    mLocation.reset();
 }
 
 bool GameIpcSession::Pump(GameIpcSettings& settings, OotmmInventory* inventory) {
@@ -162,6 +166,45 @@ bool GameIpcSession::SendCheckReport(const std::string& key) {
         report["present"] = true;
     }
     return Send(report.dump());
+}
+
+bool GameIpcSession::SendEntranceTaken(uint32_t source) {
+    if (mPendingEntrances.size() >= MaxPendingEntrances) {
+        mPendingEntrances.erase(mPendingEntrances.begin());
+    }
+    mPendingEntrances.emplace_back(++mEntranceSerial, source);
+    return SendEntranceReport(mEntranceSerial, source);
+}
+
+bool GameIpcSession::SendEntranceReport(uint64_t serial, uint32_t source) {
+    if (!mWelcomed) {
+        return false;
+    }
+    return Send(nlohmann::json{ { "type", GameIpcMessageType::EntranceTaken },
+                                { "game", mGame },
+                                { "source", source },
+                                { "serial", serial } }
+                    .dump());
+}
+
+bool GameIpcSession::SendLocation(int scene, uint32_t entrance) {
+    const std::pair<int, uint32_t> location{ scene, entrance };
+    if (mLocation == location) {
+        return true;
+    }
+    mLocation = location;
+    return SendLocationReport();
+}
+
+bool GameIpcSession::SendLocationReport() {
+    if (!mWelcomed || !mLocation.has_value()) {
+        return false;
+    }
+    return Send(nlohmann::json{ { "type", GameIpcMessageType::Location },
+                                { "game", mGame },
+                                { "scene", mLocation->first },
+                                { "entrance", mLocation->second } }
+                    .dump());
 }
 
 bool GameIpcSession::TakeRemotePresence(std::vector<OotmmPlayerPose>& poses, std::vector<OotmmPvpHit>& hits) {
@@ -316,6 +359,16 @@ void GameIpcSession::HandleMessage(const std::string& message, GameIpcSettings& 
                 SendCheckReport(key);
             }
         }
+        for (const auto& [serial, source] : mPendingEntrances) {
+            SendEntranceReport(serial, source);
+        }
+        SendLocationReport();
+        return;
+    }
+
+    if (type == GameIpcMessageType::EntranceAccepted) {
+        const uint64_t serial = root.value("serial", uint64_t{ 0 });
+        std::erase_if(mPendingEntrances, [serial](const auto& pending) { return pending.first == serial; });
         return;
     }
 
