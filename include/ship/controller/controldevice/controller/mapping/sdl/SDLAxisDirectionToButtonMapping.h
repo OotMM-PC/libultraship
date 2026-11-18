@@ -13,5 +13,11 @@ class SDLAxisDirectionToButtonMapping final : public ControllerButtonMapping, pu
     void EraseFromConfig() override;
     std::string GetPhysicalDeviceName() override;
     std::string GetPhysicalInputName() override;
+
+  private:
+    bool OtherAxisHasButton() const;
+    bool LeansThisWay(SDL_GameController* gamepad, int32_t axisValue) const;
+
+    bool mLeaning = false;
 };
 } // namespace Ship

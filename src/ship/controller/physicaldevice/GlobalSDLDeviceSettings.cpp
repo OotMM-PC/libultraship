@@ -15,6 +15,9 @@ GlobalSDLDeviceSettings::GlobalSDLDeviceSettings() {
     mTriggerAxisThresholdPercentage = Ship::Context::GetInstance()->GetConsoleVariables()->GetInteger(
         StringHelper::Sprintf("%s.TriggerAxisThresholdPercentage", mappingCvarKey.c_str()).c_str(),
         defaultAxisThresholdPercentage);
+    mStickButtonsStrongestDirectionOnly =
+        Ship::Context::GetInstance()->GetConsoleVariables()->GetInteger(
+            StringHelper::Sprintf("%s.StickButtonsStrongestDirectionOnly", mappingCvarKey.c_str()).c_str(), 1) != 0;
 }
 
 GlobalSDLDeviceSettings::~GlobalSDLDeviceSettings() {
@@ -36,6 +39,14 @@ void GlobalSDLDeviceSettings::SetTriggerAxisThresholdPercentage(int32_t triggerA
     mTriggerAxisThresholdPercentage = triggerAxisThresholdPercentage;
 }
 
+bool GlobalSDLDeviceSettings::GetStickButtonsStrongestDirectionOnly() {
+    return mStickButtonsStrongestDirectionOnly;
+}
+
+void GlobalSDLDeviceSettings::SetStickButtonsStrongestDirectionOnly(bool strongestDirectionOnly) {
+    mStickButtonsStrongestDirectionOnly = strongestDirectionOnly;
+}
+
 void GlobalSDLDeviceSettings::SaveToConfig() {
     const std::string mappingCvarKey = CVAR_PREFIX_CONTROLLERS ".GlobalSDLDeviceSettings";
     Ship::Context::GetInstance()->GetConsoleVariables()->SetInteger(
@@ -44,6 +55,9 @@ void GlobalSDLDeviceSettings::SaveToConfig() {
     Ship::Context::GetInstance()->GetConsoleVariables()->SetInteger(
         StringHelper::Sprintf("%s.TriggerAxisThresholdPercentage", mappingCvarKey.c_str()).c_str(),
         mTriggerAxisThresholdPercentage);
+    Ship::Context::GetInstance()->GetConsoleVariables()->SetInteger(
+        StringHelper::Sprintf("%s.StickButtonsStrongestDirectionOnly", mappingCvarKey.c_str()).c_str(),
+        mStickButtonsStrongestDirectionOnly ? 1 : 0);
     Ship::Context::GetInstance()->GetConsoleVariables()->Save();
 }
 
@@ -53,6 +67,8 @@ void GlobalSDLDeviceSettings::EraseFromConfig() {
         StringHelper::Sprintf("%s.StickAxisThresholdPercentage", mappingCvarKey.c_str()).c_str());
     Ship::Context::GetInstance()->GetConsoleVariables()->ClearVariable(
         StringHelper::Sprintf("%s.TriggerAxisThresholdPercentage", mappingCvarKey.c_str()).c_str());
+    Ship::Context::GetInstance()->GetConsoleVariables()->ClearVariable(
+        StringHelper::Sprintf("%s.StickButtonsStrongestDirectionOnly", mappingCvarKey.c_str()).c_str());
 
     Ship::Context::GetInstance()->GetConsoleVariables()->Save();
 }
