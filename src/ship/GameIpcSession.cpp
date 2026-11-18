@@ -454,6 +454,9 @@ void GameIpcSession::HandleMessage(const std::string& message, GameIpcSettings& 
         if (values.contains("steadyDeityBeams") && values["steadyDeityBeams"].is_boolean()) {
             settings.SteadyDeityBeams = values["steadyDeityBeams"].get<bool>();
         }
+        if (values.contains("stopTransformSlide") && values["stopTransformSlide"].is_boolean()) {
+            settings.StopTransformSlide = values["stopTransformSlide"].get<bool>();
+        }
         settings.PvpDamagePercent = std::clamp(values.value("pvpDamage", settings.PvpDamagePercent), 10, 1000);
         if (values.contains("traps") && values["traps"].is_object()) {
             const auto& traps = values["traps"];
