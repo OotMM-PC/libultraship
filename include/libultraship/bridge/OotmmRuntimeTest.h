@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <deque>
 #include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
@@ -39,6 +40,11 @@ class OotmmRuntimeTest {
 
     Pad Advance() {
         ++mFrame;
+        if (mRemaining == 0 && !mSteps.empty()) {
+            mRemaining = mSteps.front().Frames;
+            mPad = mSteps.front().Input;
+            mSteps.pop_front();
+        }
         if (mRemaining == 0) {
             ReadCommand();
         }
@@ -54,12 +60,12 @@ class OotmmRuntimeTest {
             const char* value = std::getenv("OOTMM_RUNTIME_OBS_EVERY");
             return value != nullptr && std::atoi(value) > 1 ? std::atoi(value) : 1;
         }();
-        const bool finished = mRemaining == 0 && mSequence != mLastFinishedSequence;
+        const bool finished = Pending() == 0 && mSequence != mLastFinishedSequence;
         if (every > 1 && !finished && mFrame - mLastObservedFrame < static_cast<uint64_t>(every)) {
             return false;
         }
         mLastObservedFrame = mFrame;
-        if (mRemaining == 0) {
+        if (Pending() == 0) {
             mLastFinishedSequence = mSequence;
         }
         return true;
@@ -106,11 +112,16 @@ class OotmmRuntimeTest {
         state["protocol"] = "ootmm.runtime-test.v1";
         state["frame"] = mFrame;
         state["sequence"] = mSequence;
-        state["remainingFrames"] = mRemaining;
+        state["remainingFrames"] = Pending();
         Write(state);
     }
 
   private:
+    struct Step {
+        int64_t Frames = 0;
+        Pad Input;
+    };
+
     OotmmRuntimeTest() {
         const char* directory = std::getenv("OOTMM_RUNTIME_TEST_DIR");
         if (directory == nullptr || directory[0] == '\0') {
@@ -141,6 +152,21 @@ class OotmmRuntimeTest {
         return number;
     }
 
+    static Step ReadStep(const nlohmann::json& value) {
+        return { Integer(value, "frames", 1, 3600),
+                 { uint16_t(Integer(value, "buttons", 0, 65535)), int8_t(Integer(value, "stickX", -80, 80)),
+                   int8_t(Integer(value, "stickY", -80, 80)),
+                   int8_t(value.contains("rightStickY") ? Integer(value, "rightStickY", -80, 80) : 0) } };
+    }
+
+    int64_t Pending() const {
+        int64_t frames = mRemaining;
+        for (const Step& step : mSteps) {
+            frames += step.Frames;
+        }
+        return frames;
+    }
+
     void ReadCommand() {
         const auto path = mDirectory / "input.json";
         std::error_code error;
@@ -162,11 +188,16 @@ class OotmmRuntimeTest {
             if (sequence <= mSequence) {
                 return;
             }
-            const auto frames = Integer(command, "frames", 1, 3600);
-            const auto buttons = Integer(command, "buttons", 0, 65535);
-            const auto x = Integer(command, "stickX", -80, 80);
-            const auto y = Integer(command, "stickY", -80, 80);
-            const auto rightY = command.contains("rightStickY") ? Integer(command, "rightStickY", -80, 80) : 0;
+            const Step first = ReadStep(command);
+            std::deque<Step> steps;
+            if (const auto field = command.find("then"); field != command.end()) {
+                if (!field->is_array()) {
+                    throw std::runtime_error("Invalid then");
+                }
+                for (const auto& step : *field) {
+                    steps.push_back(ReadStep(step));
+                }
+            }
             std::optional<Warp> warp;
             if (const auto field = command.find("warp"); field != command.end()) {
                 if (!field->is_array() || field->size() != 4 || !(*field)[0].is_number() ||
@@ -182,8 +213,9 @@ class OotmmRuntimeTest {
             }
             const bool hold = command.contains("hold") && command.at("hold").is_boolean() && command.at("hold").get<bool>();
             mSequence = sequence;
-            mRemaining = frames;
-            mPad = { uint16_t(buttons), int8_t(x), int8_t(y), int8_t(rightY) };
+            mRemaining = first.Frames;
+            mPad = first.Input;
+            mSteps = std::move(steps);
             mWarp = warp;
             mRoom = room;
             mHold = hold;
@@ -211,6 +243,7 @@ class OotmmRuntimeTest {
     int64_t mSequence = 0;
     int64_t mRemaining = 0;
     Pad mPad;
+    std::deque<Step> mSteps;
     std::optional<Warp> mWarp;
     std::optional<int> mRoom;
     bool mHold = false;
